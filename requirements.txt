@@ -1,0 +1,12 @@
+flask==3.1.1
+functions-framework==3.8.1
+yfinance==0.2.65
+pandas==2.2.3
+selenium==4.23.1
+webdriver-manager==4.0.1
+requests==2.31.0
+beautifulsoup4==4.12.2
+
+# Async optimization dependencies (optional but recommended)
+aiohttp==3.10.5
+asyncio
