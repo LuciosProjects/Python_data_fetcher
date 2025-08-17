@@ -26,6 +26,67 @@ except ImportError:
     run_async_data_fetch = None  # Define for type checking
     print("Async optimization not available. Install aiohttp for faster performance: pip install aiohttp")
 
+
+def python_data_fetch(request: Request):
+    """
+        This cloud function fetches financial data from outside of Google sheets
+        and returns a JSON response.
+
+        Input:
+        - request: Flask Request object containing the JSON body with 'data'
+
+        Output:
+        - JSON response with a message
+        
+    """
+
+    # Initialize output dictionary
+    output = {  
+                "status": "success", # We assume success by default, spread positivity around the world
+                "status_code": 200, # HTTP status code, 200 is default for success
+                "message": "Data fetched without errors",
+                "data": {"indicators": [], 
+                         "names": [], # Placeholder for security names
+                         "fetched_prices": [], # Placeholder for fetched prices
+                         "expense_rates": [], # Placeholder for expense rates
+                         "actual_dates": [], # Placeholder for actual dates
+                         "messages": [], # Placeholder for messages
+                         "date": None}
+            }
+
+    # Parse JSON body
+    request_json = request.get_json(silent=True)
+    
+    if not request_json or "data" not in request_json:
+        output["status"] = "error"
+        output["status_code"] = 400
+        output["message"] = "Invalid input structure. Expected format: {'data': {'indicators': [...], 'date': 'MM/DD/YYYY', ...}}"
+
+        return jsonify(output)
+
+    indicators = request_json["data"].get("indicators", [])
+    target_date = request_json["data"].get("date", None)  # Optional date, if not provided, current date will be used
+
+    output["data"]["indicators"] = indicators
+
+    if target_date == None or target_date.strip() == "":
+        output["data"]["date"] = date.today().strftime(Constants.GENERAL_DATE_FORMAT)  # Default to current date if not provided
+    else:
+        output["data"]["date"] = target_date
+
+    # Main processing logic here
+    data_fetcher_manager(output)
+
+    # Prepare a JSON response
+    # Check environment variable to determine if running in production
+    if Constants.PRODUCTION:
+        # In production (cloud), return jsonify directly
+        return jsonify(output)
+    else:
+        # In development, you can use make_response for more control or debugging
+        return json.dumps(output)
+
+
 def data_fetcher_manager(fetcher_data):
     """
         This function manages the data fetching process and 
@@ -97,62 +158,3 @@ def data_fetcher_manager(fetcher_data):
         fetcher_data["status"] = "partial_success"
     elif all(not fetch for fetch in fetch_success):
         fetcher_data["status"] = "failed"
-
-def python_data_fetch(request: Request):
-    """
-        This cloud function fetches financial data from outside of Google sheets
-        and returns a JSON response.
-
-        Input:
-        - request: Flask Request object containing the JSON body with 'data'
-
-        Output:
-        - JSON response with a message
-        
-    """
-
-    # Initialize output dictionary
-    output = {  
-                "status": "success", # We assume success by default, spread positivity around the world
-                "status_code": 200, # HTTP status code, 200 is default for success
-                "message": "Data fetched without errors",
-                "data": {"indicators": [], 
-                         "names": [], # Placeholder for security names
-                         "fetched_prices": [], # Placeholder for fetched prices
-                         "expense_rates": [], # Placeholder for expense rates
-                         "actual_dates": [], # Placeholder for actual dates
-                         "messages": [], # Placeholder for messages
-                         "date": None}
-            }
-
-    # Parse JSON body
-    request_json = request.get_json(silent=True)
-    
-    if not request_json or "data" not in request_json:
-        output["status"] = "error"
-        output["status_code"] = 400
-        output["message"] = "Invalid input structure. Expected format: {'data': {'indicators': [...], 'date': 'MM/DD/YYYY', ...}}"
-
-        return jsonify(output)
-
-    indicators = request_json["data"].get("indicators", [])
-    target_date = request_json["data"].get("date", None)  # Optional date, if not provided, current date will be used
-
-    output["data"]["indicators"] = indicators
-
-    if target_date == None or target_date.strip() == "":
-        output["data"]["date"] = date.today().strftime(Constants.GENERAL_DATE_FORMAT)  # Default to current date if not provided
-    else:
-        output["data"]["date"] = target_date
-
-    # Main processing logic here
-    data_fetcher_manager(output)
-
-    # Prepare a JSON response
-    # Check environment variable to determine if running in production
-    if os.environ.get("ENV") == "production":
-        # In production (cloud), return jsonify directly
-        return jsonify(output)
-    else:
-        # In development, you can use make_response for more control or debugging
-        return json.dumps(output)

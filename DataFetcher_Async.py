@@ -4,18 +4,12 @@ Optimized for Google Cloud Functions with proper resource management.
 """
 
 import asyncio
-import aiohttp
-import yfinance as yf
-import pandas as pd
-from datetime import date, timedelta
-from typing import List, Tuple
+from typing import List
 import logging
 import os
 
 import DataFetcher_Utilities as Utilities
 from DataFetcher_Utilities import fetchRequest, FLAGS
-import DataFetcher_Constants as Constants
-from SilentBrowser import SilentBrowser
 
 from DF_TheMarker import fetch_tase_fast, fetch_tase_historical
 from DF_YFinance import fetch_yfinance_data
