@@ -2,7 +2,7 @@ import os
 from datetime import date
 
 import json
-from flask import Request, jsonify
+from flask import Flask, request, jsonify
 
 # To increase the timeout for a Google Cloud Function (GCF), you must set the "timeout" parameter when deploying the function.
 # This cannot be set in code, but only via the deployment command or in the Google Cloud Console.
@@ -26,8 +26,23 @@ except ImportError:
     run_async_data_fetch = None  # Define for type checking
     print("Async optimization not available. Install aiohttp for faster performance: pip install aiohttp")
 
+app = Flask(__name__)
 
-def python_data_fetch(request: Request):
+@app.route('/', methods=['POST'])
+# def python_data_fetch(request: Request):
+#     """
+#         This cloud function fetches financial data from outside of Google sheets
+#         and returns a JSON response.
+
+#         Input:
+#         - request: Flask Request object containing the JSON body with 'data'
+
+#         Output:
+#         - JSON response with a message
+        
+#     """
+
+def python_data_fetch():
     """
         This cloud function fetches financial data from outside of Google sheets
         and returns a JSON response.
