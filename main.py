@@ -27,20 +27,7 @@ except ImportError:
     print("Async optimization not available. Install aiohttp for faster performance: pip install aiohttp")
 
 app = Flask(__name__)
-
 @app.route('/', methods=['POST'])
-# def python_data_fetch(request: Request):
-#     """
-#         This cloud function fetches financial data from outside of Google sheets
-#         and returns a JSON response.
-
-#         Input:
-#         - request: Flask Request object containing the JSON body with 'data'
-
-#         Output:
-#         - JSON response with a message
-        
-#     """
 
 def python_data_fetch():
     """
@@ -96,7 +83,14 @@ def python_data_fetch():
     # Check environment variable to determine if running in production
     if Constants.PRODUCTION:
         # In production (cloud), return jsonify directly
-        return jsonify(output)
+        for _ in range(Constants.MAX_ATTEMPTS):
+            try:
+                Utilities.random_delay()
+                return jsonify(output)
+            except Exception as e:
+                print(f"Attempt failed: {e}")
+
+        return jsonify({"status": "error", "message": "Failed to jsonify data after multiple attempts"})
     else:
         # In development, you can use make_response for more control or debugging
         return json.dumps(output)
