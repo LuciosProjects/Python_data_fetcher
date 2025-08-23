@@ -1,18 +1,14 @@
-import os
-from mistune import html
 import numpy as np
 from datetime import date
 import pandas as pd
 import time
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import requests
 from bs4 import BeautifulSoup
-import asyncio
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.remote.webelement import WebElement
 
 import DataFetcher_Constants as Constants
 from DataFetcher_Constants import E_FetchType
