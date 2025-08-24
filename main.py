@@ -1,4 +1,3 @@
-import os
 from datetime import date
 
 import json
@@ -94,6 +93,55 @@ def python_data_fetch():
     else:
         # In development, you can use make_response for more control or debugging
         return json.dumps(output)
+
+
+def collect_financial_data(**kwargs) -> dict:
+    """
+        This function collects financial data from various sources based on the indicators provided.
+
+        Args:
+            kwargs: Arbitrary keyword arguments containing:
+                - indicators (list[str]): List of indicator names to fetch data for.
+        
+        Returns:
+            dict: The output dictionary containing the fetched data or error messages.
+    """
+
+    # Initialize output dictionary
+    output = {  
+                "status": "success", # We assume success by default, spread positivity around the world
+                "status_code": 200, # HTTP status code, 200 is default for success
+                "message": "Data fetched without errors",
+                "data": {"indicators": [], 
+                         "names": [], # Placeholder for security names
+                         "fetched_prices": [], # Placeholder for fetched prices
+                         "expense_rates": [], # Placeholder for expense rates
+                         "actual_dates": [], # Placeholder for actual dates
+                         "messages": [], # Placeholder for messages
+                         "date": None}
+            }
+
+    # Parse indicators from kwargs
+    indicators = kwargs.get("indicators", None)
+
+    if indicators is not None:
+        output["data"]["indicators"] = indicators
+    else:
+        output["status"] = "error"
+        output["status_code"] = 400
+        output["message"] = "Invalid input structure."
+
+    # Parse target date from kwargs
+    target_date = kwargs.get("date", None)
+
+    if target_date == None or target_date.strip() == "":
+        output["data"]["date"] = date.today().strftime(Constants.GENERAL_DATE_FORMAT)  # Default to current date if not provided
+    else:
+        output["data"]["date"] = target_date
+
+    data_fetcher_manager(output)
+
+    return output
 
 
 def data_fetcher_manager(fetcher_data):
