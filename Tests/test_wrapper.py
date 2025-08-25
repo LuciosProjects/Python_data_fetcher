@@ -14,15 +14,13 @@ import gc
 import random
 
 from unittest.mock import Mock, MagicMock
-from main import python_data_fetch
+from main import collect_financial_data
 
 import DataFetcher_Constants as Constants
 
-def create_mock_request(json_data=None) -> MagicMock:
-    """Create a mock Flask Request object for testing purposes."""
-    mock_request = MagicMock()
-    mock_request.get_json.return_value = json_data
-    return mock_request
+def prepare_test_data(test_data):
+    """Prepare test data for direct function call (no mock request needed)."""
+    return test_data["data"]
 
 class TestDataConstructor:
     """Centralized test data constructor for security indicators."""
@@ -125,13 +123,12 @@ def test_function_with_valid_data():
     # Use TestDataConstructor to create mixed test data with specific date
     test_data = TestDataConstructor.create_test_data("mixed", targetDate="01/15/2024")
     
-    mock_request = create_mock_request(test_data)
-    response = python_data_fetch(mock_request)
+    data = prepare_test_data(test_data)
+    response = collect_financial_data(**data)
 
     print(f"Indicators: {test_data['data']['indicators']}")
     print(f"Date: {test_data['data']['date']}")
     print(f"Response: {response}")
-    print(f"Status Code: {getattr(response, 'status_code', 'N/A')}")
     print("-" * 50)
 
 
@@ -142,12 +139,11 @@ def test_function_with_missing_data():
     # Use TestDataConstructor to create invalid test data
     test_data = TestDataConstructor.create_test_data("missing", targetDate="15/01/2024")
 
-    mock_request = create_mock_request(test_data)
-    response = python_data_fetch(mock_request)
+    data = prepare_test_data(test_data)
+    response = collect_financial_data(**data)
     
     print(f"Request Data: {test_data}")
     print(f"Response: {response}")
-    print(f"Status Code: {getattr(response, 'status_code', 'N/A')}")
     print("-" * 50)
 
 
@@ -155,11 +151,10 @@ def test_function_with_empty_request():
     """Test the function with empty request."""
     print("Testing with empty request...")
     
-    mock_request = create_mock_request(None)
-    response = python_data_fetch(mock_request)
+    # Create empty request data
+    response = collect_financial_data()
     
     print(f"Response: {response}")
-    print(f"Status Code: {getattr(response, 'status_code', 'N/A')}")
     print("-" * 50)
 
 
@@ -171,14 +166,13 @@ def test_function_with_tase_indicators():
     test_data = TestDataConstructor.create_test_data("tase_only", targetDate=date.today().strftime("%m/%d/%Y"))
 
     start_time = timeit.default_timer()
-    mock_request = create_mock_request(test_data)
-    response = python_data_fetch(mock_request)
+    data = prepare_test_data(test_data)
+    response = collect_financial_data(**data)
     end_time = timeit.default_timer()
 
     print(f"TASE Indicators: {test_data['data']['indicators']}")
     print(f"Date: {test_data['data']['date']}")
     print(f"Response: {response}")
-    print(f"Status Code: {getattr(response, 'status_code', 'N/A')}")
     print(f"Time taken: {end_time - start_time} seconds")
     print("-" * 50)
 
@@ -186,14 +180,13 @@ def test_function_with_tase_indicators():
     test_data = TestDataConstructor.create_test_data("tase_only", targetDate="01/16/2024")
 
     start_time = timeit.default_timer()
-    mock_request = create_mock_request(test_data)
-    response = python_data_fetch(mock_request)
+    data = prepare_test_data(test_data)
+    response = collect_financial_data(**data)
     end_time = timeit.default_timer()
 
     print(f"TASE Indicators: {test_data['data']['indicators']}")
     print(f"Date: {test_data['data']['date']}")
     print(f"Response: {response}")
-    print(f"Status Code: {getattr(response, 'status_code', 'N/A')}")
     print(f"Time taken: {end_time - start_time} seconds")
     print("-" * 50)
 
@@ -209,13 +202,13 @@ def test_function_with_mixed_indicators():
         test_data = TestDataConstructor.create_test_data("mixed", targetDate=date.today().strftime("%m/%d/%Y"))
 
         start_time = timeit.default_timer()
-        mock_request = create_mock_request(test_data)
-        response = python_data_fetch(mock_request)
+        data = prepare_test_data(test_data)
+        response = collect_financial_data(**data)
         end_time = timeit.default_timer()
 
-        # Parse response (json parse)
+        # Response is already a dict, no need to parse JSON
         try:
-            parsed_response = json.loads(response)
+            parsed_response = response
         except Exception as e:
             print(f"❌ Error parsing response: {str(e)}")
             return
@@ -234,6 +227,7 @@ def test_function_with_mixed_indicators():
             fetched_prices = data.get('fetched_prices', [])
             expense_rates = data.get('expense_rates', [])
             actual_dates = data.get('actual_dates', [])
+            currencies = data.get('currencies', [])
             messages = data.get('messages', [])
 
             for i in range(N_indicators):
@@ -242,6 +236,7 @@ def test_function_with_mixed_indicators():
                 print(f"   Fetched Price: {fetched_prices[i]}")
                 print(f"   Expense Rate: {expense_rates[i]}")
                 print(f"   Actual Date: {actual_dates[i]}")
+                print(f"   Currency: {currencies[i]}")
                 print(f"   Message: {messages[i]}")
                 print()
 
@@ -252,13 +247,13 @@ def test_function_with_mixed_indicators():
     test_data = TestDataConstructor.create_test_data("mixed", targetDate="01/20/2024")
     
     start_time = timeit.default_timer()
-    mock_request = create_mock_request(test_data)
-    response = python_data_fetch(mock_request)
+    data = prepare_test_data(test_data)
+    response = collect_financial_data(**data)
     end_time = timeit.default_timer()
 
-    # Parse response (json parse)
+    # Response is already a dict, no need to parse JSON
     try:
-        parsed_response = json.loads(response)
+        parsed_response = response
     except Exception as e:
         print(f"❌ Error parsing response: {str(e)}")
         return
@@ -313,13 +308,12 @@ def interactive_test():
             
             # Parse user input as JSON
             test_data = json.loads(user_input)
-            mock_request = create_mock_request(test_data)
-            response = python_data_fetch(mock_request)
+            data = prepare_test_data(test_data)
+            response = collect_financial_data(**data)
             
             print(f"Indicators: {test_data.get('data', {}).get('indicators', 'N/A')}")
             print(f"Date: {test_data.get('data', {}).get('date', 'N/A')}")
             print(f"Response: {response}")
-            print(f"Status Code: {getattr(response, 'status_code', 'N/A')}")
             print("-" * 30)
             
         except json.JSONDecodeError:
@@ -336,13 +330,12 @@ def test_function_with_us_only():
     # Use TestDataConstructor to create US-only test data with recent date
     test_data = TestDataConstructor.create_test_data("us_only", targetDate="01/15/2024")
     
-    mock_request = create_mock_request(test_data)
-    response = python_data_fetch(mock_request)
+    data = prepare_test_data(test_data)
+    response = collect_financial_data(**data)
     
     print(f"US Symbols: {test_data['data']['indicators']}")
     print(f"Date: {test_data['data']['date']}")
     print(f"Response: {response}")
-    print(f"Status Code: {getattr(response, 'status_code', 'N/A')}")
     print("-" * 50)
 
 
@@ -353,13 +346,12 @@ def test_function_with_empty_data():
     # Use TestDataConstructor to create empty test data
     test_data = TestDataConstructor.create_test_data("empty", targetDate="01/18/2024")
     
-    mock_request = create_mock_request(test_data)
-    response = python_data_fetch(mock_request)
+    data = prepare_test_data(test_data)
+    response = collect_financial_data(**data)
     
     print(f"Empty Indicators: {test_data['data']['indicators']}")
     print(f"Date: {test_data['data']['date']}")
     print(f"Response: {response}")
-    print(f"Status Code: {getattr(response, 'status_code', 'N/A')}")
     print("-" * 50)
 
 
@@ -378,8 +370,8 @@ def test_specific_tase_historical():
     }
     
     start_time = timeit.default_timer()
-    mock_request = create_mock_request(test_data)
-    response = python_data_fetch(mock_request)
+    data = prepare_test_data(test_data)
+    response = collect_financial_data(**data)
     end_time = timeit.default_timer()
     
     print(f"TASE Indicators: {test_data['data']['indicators']}")
@@ -391,9 +383,9 @@ def test_specific_tase_historical():
     
     # Parse response to check results
     try:
-        # The function returns a JSON string in development mode
-        if isinstance(response, str):
-            result = json.loads(response)
+        # The function returns a dict directly now, not a JSON string
+        if isinstance(response, dict):
+            result = response
             data = result.get('data', {})
             
             if data.get('fetched_prices') and len(data['fetched_prices']) > 0:
@@ -434,12 +426,12 @@ def test_specific_tase_historical():
             else:
                 print(f"❌ No price data retrieved")
         else:
-            print(f"❌ Response is not a JSON string: {type(response)}")
+            print(f"❌ Response is not a dict: {type(response)}")
             
     except Exception as e:
         print(f"❌ Error parsing response: {e}")
     
-    print(f"Response Status: {getattr(response, 'status_code', 'N/A')}")
+    print(f"Response Status: {response.get('status', 'N/A')}")
     print("-" * 50)
 
 
@@ -458,14 +450,13 @@ def test_function_with_custom_data():
         currency="USD"
     )
     
-    mock_request = create_mock_request(test_data)
-    response = python_data_fetch(mock_request)
+    data = prepare_test_data(test_data)
+    response = collect_financial_data(**data)
     
     print(f"Custom Indicators: {test_data['data']['indicators']}")
     print(f"Date: {test_data['data']['date']}")
     print(f"Additional Features: {dict((k, v) for k, v in test_data['data'].items() if k not in ['indicators', 'date'])}")
     print(f"Response: {response}")
-    print(f"Status Code: {getattr(response, 'status_code', 'N/A')}")
     print("-" * 50)
 
 
@@ -484,8 +475,8 @@ def test_multiple_sequential_calls():
         start_time = timeit.default_timer()
         
         try:
-            mock_request = create_mock_request(test_data)
-            response = python_data_fetch(mock_request)
+            data = prepare_test_data(test_data)
+            response = collect_financial_data(**data)
             end_time = timeit.default_timer()
             
             print(f"✅ {test_name} - Success")
@@ -511,19 +502,18 @@ def test_tase_current_price_only():
     # Test data for current/today's price (no date = current/today's price)
     test_data = TestDataConstructor.create_test_data("tase_only", targetDate="")
     
-    mock_request = create_mock_request(test_data)
-    
     start_time = timeit.default_timer()
     
     try:
-        response = python_data_fetch(mock_request)
+        data = prepare_test_data(test_data)
+        response = collect_financial_data(**data)
         
         end_time = timeit.default_timer()
         execution_time = end_time - start_time
 
-        # Parse response (json parse)
+        # Response is already a dict, no need to parse JSON
         try:
-            parsed_response = json.loads(response)
+            parsed_response = response
         except Exception as e:
             print(f"❌ Error parsing response: {str(e)}")
             return
@@ -574,19 +564,18 @@ def test_tase_historical_only():
                 targetDate="01/05/2021")
     # Handpicked securities for TASE historical data fetching
     
-    mock_request = create_mock_request(test_data)
-    
     start_time = timeit.default_timer()
     
     try:
-        response = python_data_fetch(mock_request)
+        data = prepare_test_data(test_data)
+        response = collect_financial_data(**data)
         
         end_time = timeit.default_timer()
         execution_time = end_time - start_time
         
-        # Parse response (json parse)
+        # Response is already a dict, no need to parse JSON
         try:
-            parsed_response = json.loads(response)
+            parsed_response = response
         except Exception as e:
             print(f"❌ Error parsing response: {str(e)}")
             return
@@ -634,23 +623,21 @@ def test_yfinance_only():
     # Test data for YFinance
     test_data = TestDataConstructor.create_test_data("us_only", targetDate="01/01/2024")
     
-    mock_request = create_mock_request(test_data)
-    
     start_time = timeit.default_timer()
     
     try:
-        response = python_data_fetch(mock_request)
+        data = prepare_test_data(test_data)
+        response = collect_financial_data(**data)
         
         end_time = timeit.default_timer()
         execution_time = end_time - start_time
         
         print(f"\n⏱️  Execution time: {execution_time:.2f} seconds")
         print(f"📊 Response: {response}")
-        print(f"📊 Status Code: {getattr(response, 'status_code', 'N/A')}")
         
         print(f"✅ YFinance data test completed successfully!")
         print(f"🔍 Request data: {test_data['data']['indicators']}")
-        print(f"� Target date: {test_data['data']['date']}")
+        print(f"📅 Target date: {test_data['data']['date']}")
                     
     except Exception as e:
         print(f"❌ Exception occurred: {str(e)}")
@@ -664,7 +651,7 @@ if __name__ == "__main__":
     Constants.BYPASS_ASYNC_CHECKUP = False  # Bypass async check
 
     print("=" * 60)
-    print("Testing python_data_fetcher Google Cloud Function")
+    print("Testing Local Data Fetcher API (Direct Function Calls)")
     print("Security Indicators Test Suite")
     print(f"Debug mode is set to {Constants.DEBUG_MODE}")
     print(f"Async bypass is set to {Constants.BYPASS_ASYNC_CHECKUP}")

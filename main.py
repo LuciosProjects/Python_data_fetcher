@@ -1,4 +1,3 @@
-import os
 from datetime import date
 
 import json
@@ -27,20 +26,7 @@ except ImportError:
     print("Async optimization not available. Install aiohttp for faster performance: pip install aiohttp")
 
 app = Flask(__name__)
-
 @app.route('/', methods=['POST'])
-# def python_data_fetch(request: Request):
-#     """
-#         This cloud function fetches financial data from outside of Google sheets
-#         and returns a JSON response.
-
-#         Input:
-#         - request: Flask Request object containing the JSON body with 'data'
-
-#         Output:
-#         - JSON response with a message
-        
-#     """
 
 def python_data_fetch():
     """
@@ -56,18 +42,7 @@ def python_data_fetch():
     """
 
     # Initialize output dictionary
-    output = {  
-                "status": "success", # We assume success by default, spread positivity around the world
-                "status_code": 200, # HTTP status code, 200 is default for success
-                "message": "Data fetched without errors",
-                "data": {"indicators": [], 
-                         "names": [], # Placeholder for security names
-                         "fetched_prices": [], # Placeholder for fetched prices
-                         "expense_rates": [], # Placeholder for expense rates
-                         "actual_dates": [], # Placeholder for actual dates
-                         "messages": [], # Placeholder for messages
-                         "date": None}
-            }
+    output = Utilities.initialize_output_dict()
 
     # Parse JSON body
     request_json = request.get_json(silent=True)
@@ -96,10 +71,55 @@ def python_data_fetch():
     # Check environment variable to determine if running in production
     if Constants.PRODUCTION:
         # In production (cloud), return jsonify directly
-        return jsonify(output)
+        for _ in range(Constants.MAX_ATTEMPTS):
+            try:
+                Utilities.random_delay()
+                return jsonify(output)
+            except Exception as e:
+                print(f"Attempt failed: {e}")
+
+        return jsonify({"status": "error", "message": "Failed to jsonify data after multiple attempts"})
     else:
         # In development, you can use make_response for more control or debugging
         return json.dumps(output)
+
+
+def collect_financial_data(**kwargs) -> dict:
+    """
+        This function collects financial data from various sources based on the indicators provided.
+
+        Args:
+            kwargs: Arbitrary keyword arguments containing:
+                - indicators (list[str]): List of indicator names to fetch data for.
+        
+        Returns:
+            dict: The output dictionary containing the fetched data or error messages.
+    """
+
+    # Initialize output dictionary
+    output = Utilities.initialize_output_dict()
+
+    # Parse indicators from kwargs
+    indicators = kwargs.get("indicators", None)
+
+    if indicators is not None:
+        output["data"]["indicators"] = indicators
+    else:
+        output["status"] = "error"
+        output["status_code"] = 400
+        output["message"] = "Invalid input structure."
+
+    # Parse target date from kwargs
+    target_date = kwargs.get("date", None)
+
+    if target_date == None or target_date.strip() == "":
+        output["data"]["date"] = date.today().strftime(Constants.GENERAL_DATE_FORMAT)  # Default to current date if not provided
+    else:
+        output["data"]["date"] = target_date
+
+    data_fetcher_manager(output)
+
+    return output
 
 
 def data_fetcher_manager(fetcher_data):
@@ -166,6 +186,7 @@ def data_fetcher_manager(fetcher_data):
         fetcher_data["data"]["expense_rates"].append(result.expense_rate) # Append expense rate
         fetcher_data["data"]["names"].append(result.name) # Append security name
         fetcher_data["data"]["actual_dates"].append(result.actual_date) # Append actual date
+        fetcher_data["data"]["currencies"].append(result.currency) # Append currency
         fetcher_data["data"]["messages"].append(result.message) # Append status message
         fetch_success[i] = result.success
 

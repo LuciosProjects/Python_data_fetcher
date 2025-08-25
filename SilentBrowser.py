@@ -3,6 +3,10 @@ Silent Selenium automation for Israeli financial websites.
 This module provides a headless browser setup for scraping Israeli securities data.
 """
 
+import time
+import random
+import logging
+
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -11,9 +15,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
-import time
-import random
-import logging
 
 import DataFetcher_Constants as Constants
 
@@ -106,7 +107,7 @@ class SilentBrowser:
             self.wait: WebDriverWait = WebDriverWait(self.driver, self.wait_timeout)
             
         except Exception as e:
-            raise Exception(f"Failed to initialize browser: {str(e)}")
+            raise Exception(f"SilentBrowser::_setup_browser - Failed to initialize browser: {str(e)}")
     
     def is_javascript_enabled(self):
         """
@@ -165,7 +166,7 @@ class SilentBrowser:
             
             return True
         except Exception as e:
-            print(f"Navigation failed: {str(e)}")
+            print(f"SilentBrowser::navigate_to - Navigation to '{url}' failed: {str(e)}")
             self.is_url_loaded = False
             return False
     
@@ -199,10 +200,10 @@ class SilentBrowser:
             
             return True
         except TimeoutException:
-            print(f"Element not found or not clickable: {locator}")
+            print(f"SilentBrowser::click_element - Element not found or not clickable: {locator}")
             return False
         except Exception as e:
-            print(f"Click failed: {str(e)}")
+            print(f"SilentBrowser::click_element - Click failed: {str(e)}")
             return False
     
     def fill_text(self, by, locator, text, clear_first=True):
@@ -232,7 +233,7 @@ class SilentBrowser:
             self._random_delay(0.3, 0.7)
             return True
         except Exception as e:
-            print(f"Text input failed: {str(e)}")
+            print(f"SilentBrowser::fill_text - Text input failed: {str(e)}")
             return False
     
     def get_text(self, by, locator):
@@ -250,7 +251,7 @@ class SilentBrowser:
             element = self.wait.until(EC.presence_of_element_located((by, locator)))
             return element.text.strip()
         except Exception as e:
-            print(f"Get text failed: {str(e)}")
+            print(f"SilentBrowser::get_text - Get text failed: {str(e)}")
             return None
     
     def wait_for_element(self, by, locator, timeout=None):
@@ -333,7 +334,7 @@ class SilentBrowser:
             return True
             
         except Exception as e:
-            print(f"Browser restart failed: {str(e)}")
+            print(f"SilentBrowser::restart_browser - Browser restart failed: {str(e)}")
             return False
     
     def toggle_javascript_and_restart(self, enable_javascript):

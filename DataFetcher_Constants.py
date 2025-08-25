@@ -11,7 +11,7 @@ class E_FetchType(Enum):
 
 
 # General Constants for Data Fetcher
-VERSION                = "1.0.1" # Version of the Data Fetcher
+VERSION                = "1.1.1" # Version of the Data Fetcher
 PRODUCTION             = True    # Set to True for production environment
 
 DEBUG_MODE             = False   # When True, browser will be visible for debugging
@@ -25,6 +25,9 @@ INITIAL_DAYS_HALF_SPAN  = 5 # Maximum days to look back & forward for data
 HALF_SPAN_INCREMENT     = 5 # Increment for looking back/forward days
 
 GENERAL_DATE_FORMAT     = "%m/%d/%Y"  # General date format used across the application
+
+# DataBase
+DB_TTL = int(60*60*24*365) # Time-to-live for database entries (in seconds)
 
 # Silent Browser Constants
 SILENT_BROWSER_TIMEOUT = 60  # Timeout for silent browser operations
