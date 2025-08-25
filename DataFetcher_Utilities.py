@@ -35,6 +35,7 @@ class fetchRequest:
     actual_date: str = ""
     success: bool = True
     message: str = ""
+    currency: str = ""
 
     def __post_init__(self):
         # Ensure date is a string
