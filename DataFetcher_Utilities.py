@@ -65,6 +65,28 @@ class data_fetcher_flags:
 FLAGS = data_fetcher_flags()
 
 # Functions
+def initialize_output_dict() -> dict:
+    '''
+        Initializes the output dictionary for data fetching functions.
+    '''
+
+    # Initialize output dictionary
+    output = {  
+                "status": "success", # We assume success by default, spread positivity around the world
+                "status_code": 200, # HTTP status code, 200 is default for success
+                "message": "Data fetched without errors",
+                "data": {"indicators": [], 
+                         "names": [], # Placeholder for security names
+                         "fetched_prices": [], # Placeholder for fetched prices
+                         "expense_rates": [], # Placeholder for expense rates
+                         "actual_dates": [], # Placeholder for actual dates
+                         "currencies": [], # Placeholder for currencies
+                         "messages": [], # Placeholder for messages
+                         "date": None}
+            }
+    
+    return output
+
 def get_request_session():
     """Get or create a requests session for connection reuse"""
     global _REQUEST_SESSION

@@ -21,140 +21,6 @@ logging.getLogger('yfinance').setLevel(logging.CRITICAL)
 GCF_MAX_CONCURRENT = int(os.environ.get("GCF_MAX_CONCURRENT", "5"))  # Limit concurrent connections
 GCF_TIMEOUT = int(os.environ.get("GCF_TIMEOUT", "30"))  # Shorter timeout for cloud
 GCF_CONNECTOR_LIMIT = int(os.environ.get("GCF_CONNECTOR_LIMIT", "10"))  # Connection pool limit
-
-# class AsyncDataFetcher:
-#     """Async data fetcher optimized for Google Cloud Functions"""
-    
-#     def __init__(self):
-#         self.session = None
-#         self.semaphore = asyncio.Semaphore(GCF_MAX_CONCURRENT)
-#         # Remove shared browser since we use Utilities.SB
-#         self.window_semaphore = asyncio.Semaphore(3)  # Limit concurrent windows
-    
-#     async def __aenter__(self):
-#         """Async context manager entry with GCF optimizations"""
-#         # Create connector with limits for cloud environment
-#         connector = aiohttp.TCPConnector(
-#             limit=GCF_CONNECTOR_LIMIT,
-#             limit_per_host=3,  # Limit per host to avoid overwhelming servers
-#             ttl_dns_cache=300,  # DNS cache for 5 minutes
-#             use_dns_cache=True,
-#         )
-        
-#         self.session = aiohttp.ClientSession(
-#             connector=connector,
-#             timeout=aiohttp.ClientTimeout(total=GCF_TIMEOUT, connect=10),
-#             headers={
-#                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-#                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-#                 'Accept-Language': 'en-US,en;q=0.5',
-#                 'Accept-Encoding': 'gzip, deflate',
-#                 'Connection': 'keep-alive',
-#             }
-#         )
-#         return self
-    
-#     async def __aexit__(self, exc_type, exc_val, exc_tb):
-#         """Async context manager exit with proper cleanup"""
-#         if self.session:
-#             await self.session.close()
-#             # Give a moment for connections to close properly
-#             await asyncio.sleep(0.1)
-        
-#         # Note: We don't clean up Utilities.SB here since it's managed elsewhere
-
-#     async def fetch_yfinance_async(self, request: fetchRequest):
-#         """Async version of YFinance data fetching with semaphore"""
-#         async with self.semaphore:  # Limit concurrent operations
-#             try:
-#                 # Run YFinance in thread pool since it's not async-native
-#                 loop = asyncio.get_event_loop()
-#                 # result = await loop.run_in_executor(None, fetch_yfinance_data, request)
-#                 # TBD - will be implemented later
-
-#             except Exception as e:
-#                 request.message = f"Async YFinance error: {str(e)}"
-
-#     async def fetch_tase_fast_async(self, request: fetchRequest) -> bool:
-#         """Async version of TASE fast fetching with semaphore"""
-#         async with self.semaphore:  # Limit concurrent operations
-#             url = Constants.BASE_TASE_URL(request.indicator)
-            
-#             try:
-#                 if not self.session:
-#                     request.message = "Session not initialized"
-#                     return False
-                    
-#                 async with self.session.get(url) as response:
-#                     if response.status != 200:
-#                         request.message = f"HTTP {response.status}: Failed to fetch page"
-#                         return False
-                    
-#                     html_content = await response.text()
-                    
-#                     # Parse with BeautifulSoup (run in thread pool)
-#                     loop = asyncio.get_event_loop()
-#                     result = await loop.run_in_executor(
-#                         None, 
-#                         self._parse_tase_html, 
-#                         html_content, 
-#                         request
-#                     )
-#                     return result
-                    
-#             except asyncio.TimeoutError:
-#                 request.message = f"Async request timeout ({GCF_TIMEOUT}s)"
-#                 return False
-#             except Exception as e:
-#                 request.message = f"Async TASE error: {str(e)}"
-#                 return False
-    
-#     def _parse_tase_html(self, html_content: str, request: fetchRequest) -> bool:
-#         """Parse TASE HTML content (runs in thread pool)"""
-#         try:
-#             from bs4 import BeautifulSoup
-#             soup = BeautifulSoup(html_content, 'html.parser')
-            
-#             # Extract name
-#             name_element = soup.select_one('#__next > div.fe.ff > main > div > div.nc.nd.ne.nf > div.fy.ng > div > h2')
-#             request.name = name_element.get_text(strip=True) if name_element else ""
-            
-#             # Extract price
-#             price_element = soup.select_one('#__next > div.fe.ff > main > div > div.nc.nd.ne.nf > div.fy.nm > div > div.ha.hb.no.hd.gt.he.hf.np.nq.nr.ns.nt.nu.nv.nw.nx.ny.cz.z.au.nz.hw.hx.hy.hz.aw.aj > div.fi.z.oa.ct.cc.ob.oc.od.oe.of.kd.ke > div:nth-child(1) > span.om.kc.on.nk.oo.op')
-            
-#             if price_element:
-#                 price_text = price_element.get_text(strip=True).replace(",", "")
-#                 request.fetched_price = float(price_text) / 100.0
-#                 request.message = "Price fetched successfully (async fast method)"
-#                 return True
-#             else:
-#                 request.message = "Price element not found"
-#                 return False
-                
-#         except Exception as e:
-#             request.message = f"HTML parsing error: {str(e)}"
-#             return False
-
-#     async def fetch_tase_historical_async(self, request: fetchRequest) -> bool:
-#         """Async version of TASE historical data fetching using existing SilentBrowser"""
-#         async with self.window_semaphore:  # Limit concurrent windows
-#             try:
-#                 # Call the dedicated browser method directly
-#                 result = await self._fetch_historical_with_dedicated_browser(request)
-#                 return result
-                
-#             except Exception as e:
-#                 request.message = f"Async historical TASE error: {str(e)}"
-#                 return False
-    
-#     async def _fetch_historical_with_dedicated_browser(self, request: fetchRequest) -> bool:
-#         """Fetch historical data using a dedicated SilentBrowser instance for true parallelization"""
-#         try:
-#             # Use the new dedicated browser approach - no shared browser, no race conditions!
-#             return await Utilities.fetch_historical_data_enhanced_with_dedicated_browser(request)
-#         except Exception as e:
-#             request.message = f"Error in dedicated browser fetch: {str(e)}"
-#             return False
     
 # Async Caller Functions - Use Dedicated Browsers for True Parallelization
 async def fetch_yfinance_data_async(requests: List[fetchRequest]) -> List[fetchRequest]:
@@ -285,6 +151,7 @@ async def data_fetcher_manager_async(fetcher_data):
         fetcher_data["data"]["expense_rates"].append(request.expense_rate)
         fetcher_data["data"]["names"].append(request.name)
         fetcher_data["data"]["actual_dates"].append(request.actual_date)
+        fetcher_data["data"]["currencies"].append(request.currency)
         fetcher_data["data"]["messages"].append(request.message)
     
     # Update overall status

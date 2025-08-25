@@ -42,18 +42,7 @@ def python_data_fetch():
     """
 
     # Initialize output dictionary
-    output = {  
-                "status": "success", # We assume success by default, spread positivity around the world
-                "status_code": 200, # HTTP status code, 200 is default for success
-                "message": "Data fetched without errors",
-                "data": {"indicators": [], 
-                         "names": [], # Placeholder for security names
-                         "fetched_prices": [], # Placeholder for fetched prices
-                         "expense_rates": [], # Placeholder for expense rates
-                         "actual_dates": [], # Placeholder for actual dates
-                         "messages": [], # Placeholder for messages
-                         "date": None}
-            }
+    output = Utilities.initialize_output_dict()
 
     # Parse JSON body
     request_json = request.get_json(silent=True)
@@ -108,18 +97,7 @@ def collect_financial_data(**kwargs) -> dict:
     """
 
     # Initialize output dictionary
-    output = {  
-                "status": "success", # We assume success by default, spread positivity around the world
-                "status_code": 200, # HTTP status code, 200 is default for success
-                "message": "Data fetched without errors",
-                "data": {"indicators": [], 
-                         "names": [], # Placeholder for security names
-                         "fetched_prices": [], # Placeholder for fetched prices
-                         "expense_rates": [], # Placeholder for expense rates
-                         "actual_dates": [], # Placeholder for actual dates
-                         "messages": [], # Placeholder for messages
-                         "date": None}
-            }
+    output = Utilities.initialize_output_dict()
 
     # Parse indicators from kwargs
     indicators = kwargs.get("indicators", None)
@@ -208,6 +186,7 @@ def data_fetcher_manager(fetcher_data):
         fetcher_data["data"]["expense_rates"].append(result.expense_rate) # Append expense rate
         fetcher_data["data"]["names"].append(result.name) # Append security name
         fetcher_data["data"]["actual_dates"].append(result.actual_date) # Append actual date
+        fetcher_data["data"]["currencies"].append(result.currency) # Append currency
         fetcher_data["data"]["messages"].append(result.message) # Append status message
         fetch_success[i] = result.success
 
