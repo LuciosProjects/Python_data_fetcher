@@ -98,6 +98,7 @@ def fetch_tase_historical(request: fetchRequest):
 
     url = Constants.BASE_TASE_URL(request.indicator)
 
+    request.currency = 'ILS'
     for attempt in range(Constants.MAX_ATTEMPTS):
         try:
             if FLAGS.ASYNC_MODE:

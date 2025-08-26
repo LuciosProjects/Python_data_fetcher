@@ -102,8 +102,8 @@ def fetch_yfinance_data(requests: list[fetchRequest]):
                 if tckrs.tickers[symbol] is not None:
                     matched_request.name = tckrs.tickers[symbol].info.get("longName","")  # Set the name to the ticker symbol
                     matched_request.expense_rate = tckrs.tickers[symbol].info.get("netExpenseRatio", 0.0)
-                    # matched_request.currency = tckrs.tickers[symbol].info.get("currency", "")
-                    matched_request.currency = 'USD'
+                    matched_request.currency = tckrs.tickers[symbol].info.get("financialCurrency", 
+                                                                              tckrs.tickers[symbol].info.get("currency", ""))
 
                 # Set success message
                 closest_date_obj = pd.to_datetime(closest_date).date()
