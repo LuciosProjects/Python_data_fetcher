@@ -12,9 +12,12 @@ import timeit
 import asyncio
 import gc
 import random
+import requests
+import threading
+import time
 
 from unittest.mock import Mock, MagicMock
-from main import collect_financial_data
+from main import collect_financial_data, app
 
 import DataFetcher_Constants as Constants
 
@@ -27,18 +30,20 @@ class TestDataConstructor:
     
     # Define security indicators
     US_SYMBOLS = ["GOOG", "SCHD", "NVDA", "VOO", "DGRO", "JEPI", "IBIT", "IAU"]
+    EUROPEAN_SYMBOLS = ['ASML', 'SAP', 'NESN.SW', 'ROG.SW', 'NOVN.SW', 'MC.PA', 'OR.PA', 'SAN.PA', 'INGA.AS', 'SIE.DE']
     TASE_INDICATORS = ["5138094", "1104249", "1144633", "1183441", \
                         "5111422", "5117379", "1159094", "1159169", "1186063"]
     
     @classmethod
-    def create_test_data(cls, data_type="mixed", how_many_each=None, custom_indicators=None, targetDate=None, **kwargs):
+    def create_test_data(cls, data_type="missing", how_many_each=None, random_choice=True, custom_indicators=None, targetDate=None, **kwargs):
         """
         Create test data for different scenarios.
         
         Args:
             data_type (str): Type of test data to create
-                - "us_only": Only US stock symbols
-                - "tase_only": Only TASE indicators  
+                - "us": Only US stock symbols
+                - "eu": Only EU stock symbols
+                - "tase": Only TASE indicators  
                 - "mixed": Mix of US symbols and TASE indicators
                 - "custom": Use custom_indicators parameter
                 - "empty": Empty indicators array
@@ -62,23 +67,30 @@ class TestDataConstructor:
             "date": targetDate
         }
 
-        GET_LIST = lambda indicatorList: indicatorList[:how_many_each] if how_many_each is not None else indicatorList
+        if random_choice:
+            GET_LIST = lambda indicatorList: random.sample(indicatorList, how_many_each) if how_many_each is not None else indicatorList
+        else:
+            GET_LIST = lambda indicatorList: indicatorList[:how_many_each] if how_many_each is not None else indicatorList
 
         # Add any additional features passed via kwargs
         base_data.update(kwargs)
         
-        if data_type == "us_only":
+        if data_type == "us":
             base_data["indicators"] = GET_LIST(cls.US_SYMBOLS)  # All US symbols
 
-        elif data_type == "tase_only":
+        elif data_type == "tase":
             base_data["indicators"] = GET_LIST(cls.TASE_INDICATORS)
+
+        elif data_type == "eu":
+            base_data["indicators"] = GET_LIST(cls.EUROPEAN_SYMBOLS)
 
         elif data_type == "mixed":
             # Interleave US symbols and TASE indicators
             us_symbols      = GET_LIST(cls.US_SYMBOLS)
+            eu_symbols      = GET_LIST(cls.EUROPEAN_SYMBOLS)
             tase_indicators = GET_LIST(cls.TASE_INDICATORS)
 
-            mixed_list = us_symbols + tase_indicators
+            mixed_list = us_symbols + eu_symbols + tase_indicators
 
             # Shuffle the mixed list
             random.shuffle(mixed_list)
@@ -106,12 +118,13 @@ class TestDataConstructor:
     def get_example_data(cls):
         """Get example data for interactive testing."""
         return {
-            "US Symbols": cls.create_test_data("us_only", targetDate="01/15/2024"),
-            "TASE Numbers": cls.create_test_data("tase_only", targetDate="01/16/2024"),
-            "Mixed List": cls.create_test_data("mixed", targetDate="01/17/2024"),
+            "US Symbols": cls.create_test_data("us", targetDate="01/15/2024"),
+            "European Symbols": cls.create_test_data("eu", targetDate="01/16/2024"),
+            "TASE Numbers": cls.create_test_data("tase", targetDate="01/17/2024"),
+            "Mixed List": cls.create_test_data("mixed", targetDate="01/18/2024"),
             "Custom Example": cls.create_test_data("custom", 
                                                  custom_indicators=["AAPL", "5138094", "GOOGL"], 
-                                                 targetDate="01/18/2024",
+                                                 targetDate="01/19/2024",
                                                  market="mixed")
         }
 
@@ -286,43 +299,6 @@ def test_function_with_mixed_indicators():
     print(f"Time taken: {end_time - start_time} seconds")
     print("-" * 50)
 
-
-def interactive_test():
-    """Allow interactive testing with custom security indicators."""
-    print("Interactive Testing Mode")
-    print("Enter your security indicators as JSON (or 'quit' to exit):")
-    print("Examples from TestDataConstructor:")
-    
-    # Show examples using TestDataConstructor
-    examples = TestDataConstructor.get_example_data()
-    for name, data in examples.items():
-        print(f'  {name}: {json.dumps(data)}')
-    
-    print("")
-    
-    while True:
-        try:
-            user_input = input("> ")
-            if user_input.lower() == 'quit':
-                break
-            
-            # Parse user input as JSON
-            test_data = json.loads(user_input)
-            data = prepare_test_data(test_data)
-            response = collect_financial_data(**data)
-            
-            print(f"Indicators: {test_data.get('data', {}).get('indicators', 'N/A')}")
-            print(f"Date: {test_data.get('data', {}).get('date', 'N/A')}")
-            print(f"Response: {response}")
-            print("-" * 30)
-            
-        except json.JSONDecodeError:
-            print("Invalid JSON format. Please try again.")
-        except KeyboardInterrupt:
-            print("\nExiting interactive mode...")
-            break
-
-
 def test_function_with_us_only():
     """Test the function with US symbols only."""
     print("Testing with US symbols only...")
@@ -460,14 +436,59 @@ def test_function_with_custom_data():
     print("-" * 50)
 
 
+def test_function_with_european_stocks():
+    """Test the function with European stock symbols only."""
+    print("Testing with European stock symbols only...")
+    
+    # Use TestDataConstructor to create European-only test data
+    test_data = TestDataConstructor.create_test_data("eu")
+    
+    start_time = timeit.default_timer()
+    data = prepare_test_data(test_data)
+    response = collect_financial_data(**data)
+    end_time = timeit.default_timer()
+    
+    print(f"European Symbols: {test_data['data']['indicators']}")
+    print(f"Date: {test_data['data']['date']}")
+    print(f"Time taken: {end_time - start_time:.2f} seconds")
+    
+    # Parse and display response
+    if isinstance(response, dict):
+        print(f"Status: {response.get('status', 'N/A')}")
+        print(f"Message: {response.get('message', 'N/A')}")
+        
+        data_response = response.get('data', {})
+        if data_response:
+            indicators = data_response.get('indicators', [])
+            names = data_response.get('names', [])
+            fetched_prices = data_response.get('fetched_prices', [])
+            actual_dates = data_response.get('actual_dates', [])
+            currencies = data_response.get('currencies', [])
+            messages = data_response.get('messages', [])
+            
+            print(f"\n📊 RESULTS FOR EUROPEAN STOCKS:")
+            for i, indicator in enumerate(indicators):
+                print(f"📈 {indicator}:")
+                print(f"   Name: {names[i]}")
+                print(f"   Price: {fetched_prices[i]}")
+                print(f"   Currency: {currencies[i]}")
+                print(f"   Date: {actual_dates[i]}")
+                print(f"   Message: {messages[i]}")
+                print()
+    else:
+        print(f"Response: {response}")
+    
+    print("-" * 50)
+
 def test_multiple_sequential_calls():
     """Test multiple sequential calls to ensure no async loop conflicts."""
     print("Testing multiple sequential calls...")
     
     test_cases = [
-        ("US Symbols", TestDataConstructor.create_test_data("us_only", targetDate="01/15/2024")),
-        ("TASE Indicators", TestDataConstructor.create_test_data("tase_only", targetDate="01/16/2024")),
-        ("Mixed Indicators", TestDataConstructor.create_test_data("mixed", targetDate="01/17/2024"))
+        ("US Symbols", TestDataConstructor.create_test_data("us", targetDate="01/15/2024")),
+        ("European Symbols", TestDataConstructor.create_test_data("eu", targetDate="01/16/2024")),
+        ("TASE Indicators", TestDataConstructor.create_test_data("tase", targetDate="01/17/2024")),
+        ("Mixed Indicators", TestDataConstructor.create_test_data("mixed", targetDate="01/18/2024"))
     ]
     
     for test_name, test_data in test_cases:
@@ -646,7 +667,174 @@ def test_yfinance_only():
     print("YFinance data test completed!")
 
 
+def start_flask_server():
+    """Start Flask server in a separate thread for testing."""
+    try:
+        app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False, threaded=True)
+    except Exception as e:
+        print(f"❌ Flask server error: {e}")
+
+
+def test_http_post_request():
+    """Test the Flask app via HTTP POST request."""
+    print("\n" + "="*60)
+    print("🌐 TESTING: HTTP POST Request to Flask Server")
+    print("="*60)
+    
+    # Start Flask server in background thread
+    server_thread = threading.Thread(target=start_flask_server, daemon=True)
+    server_thread.start()
+    
+    # Wait for server to start and check if it's responding
+    url = "http://127.0.0.1:5000/"
+    max_retries = 10
+    server_ready = False
+    
+    for i in range(max_retries):
+        try:
+            # Simple health check - try to connect
+            response = requests.get("http://127.0.0.1:5000/", timeout=1)
+            server_ready = True
+            break
+        except:
+            print(f"⏳ Waiting for server to start... ({i+1}/{max_retries})")
+            time.sleep(0.5)
+    
+    if not server_ready:
+        print("❌ Failed to start Flask server")
+        return
+    
+    # Test data
+    test_data = TestDataConstructor.create_test_data("mixed", 
+                                                     targetDate="01/15/2024", 
+                                                     how_many_each=3)
+    
+    # Flask endpoint URL
+    url = "http://127.0.0.1:5000/"
+    
+    try:
+        print(f"🚀 Sending POST request to {url}")
+        print(f"📊 Request data: {test_data}")
+        
+        start_time = timeit.default_timer()
+        
+        # Calculate timeout based on number of indicators
+        api_timeout = len(test_data['data']['indicators']) * 20.0
+
+        # Send POST request
+        response = requests.post(
+            url, 
+            headers={'Content-Type': 'application/json'},
+            json=test_data,
+            timeout=api_timeout
+        )
+        
+        end_time = timeit.default_timer()
+        execution_time = end_time - start_time
+        
+        print(f"\n✅ HTTP Response received!")
+        print(f"📈 Status Code: {response.status_code}")
+        print(f"⏱️  Execution time: {execution_time:.2f} seconds")
+        
+        if response.status_code == 200:
+            try:
+                response_data = response.json()
+                
+                # Validate response structure
+                if 'status' in response_data and 'data' in response_data:
+                    print(f"✅ Response structure is valid")
+                    print(f"🔍 Status: {response_data['status']}")
+                    print(f"🔍 Message: {response_data.get('message', 'N/A')}")
+
+                    for i, indicator in enumerate(response_data['data']['indicators']):
+                        print(f"  - Indicator: {indicator}")
+                        print(f"  - name: {response_data['data']['names'][i]}")
+                        print(f"  - price: {response_data['data']['fetched_prices'][i]}")
+                        print(f"  - expense_rate: {response_data['data']['expense_rates'][i]}")
+                        print(f"  - actual_date: {response_data['data']['actual_dates'][i]}")
+                        print(f"  - currency: {response_data['data']['currencies'][i]}")
+                        print(f"  - message: {response_data['data']['messages'][i]}\n")
+                else:
+                    print(f"❌ Response structure is invalid")
+                    
+            except json.JSONDecodeError as e:
+                print(f"❌ Failed to parse JSON response: {e}")
+                print(f"📄 Raw response: {response.text}")
+        else:
+            print(f"❌ HTTP request failed with status {response.status_code}")
+            print(f"📄 Response text: {response.text}")
+            
+    except requests.exceptions.ConnectionError:
+        print(f"❌ Failed to connect to Flask server at {url}")
+        print(f"💡 Make sure the server is running")
+    except requests.exceptions.Timeout:
+        print(f"❌ Request timed out after 30 seconds")
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+    
+    print("\n" + "="*50)
+    print("HTTP POST request test completed!")
+
+
+def test_http_post_multiple_requests():
+    """Test multiple HTTP POST requests to check server stability."""
+    print("\n" + "="*60)
+    print("🌐 TESTING: Multiple HTTP POST Requests")
+    print("="*60)
+    
+    # Start Flask server in background thread
+    server_thread = threading.Thread(target=start_flask_server, daemon=True)
+    server_thread.start()
+    
+    # Wait for server to start
+    time.sleep(2)
+    
+    url = "http://127.0.0.1:5000/"
+    
+    test_cases = [
+        ("US Only", TestDataConstructor.create_test_data("us_only", targetDate="01/15/2024")),
+        ("TASE Only", TestDataConstructor.create_test_data("tase_only", targetDate="01/16/2024")),
+        ("Mixed", TestDataConstructor.create_test_data("mixed", targetDate="01/17/2024"))
+    ]
+    
+    for test_name, test_data in test_cases:
+        print(f"\n--- Testing {test_name} ---")
+        
+        try:
+            start_time = timeit.default_timer()
+            
+            response = requests.post(
+                url, 
+                json=test_data,
+                headers={'Content-Type': 'application/json'},
+                timeout=30
+            )
+            
+            end_time = timeit.default_timer()
+            execution_time = end_time - start_time
+            
+            if response.status_code == 200:
+                print(f"✅ {test_name} - Success (Status: {response.status_code})")
+                print(f"⏱️  Time: {execution_time:.2f} seconds")
+                
+                try:
+                    response_data = response.json()
+                    print(f"📊 Status: {response_data.get('status', 'N/A')}")
+                    print(f"💬 Message: {response_data.get('message', 'N/A')}")
+                except:
+                    print(f"📄 Raw response length: {len(response.text)} chars")
+            else:
+                print(f"❌ {test_name} - Failed (Status: {response.status_code})")
+                
+        except Exception as e:
+            print(f"❌ {test_name} - Error: {e}")
+    
+    print("\n" + "="*50)
+    print("Multiple HTTP POST requests test completed!")
+
+
 if __name__ == "__main__":
+    Constants.PRODUCTION = False
     Constants.DEBUG_MODE = False  # Enable debug mode for browser visibility
     Constants.BYPASS_ASYNC_CHECKUP = False  # Bypass async check
 
@@ -662,6 +850,14 @@ if __name__ == "__main__":
     # test_tase_historical_only()         # TASE historical data with Selenium
     # test_yfinance_only()                # YFinance US stock data
     
+    # Test European stocks
+    # test_function_with_european_stocks()         # European stocks only
+    # test_function_with_limited_european_stocks() # Limited European stocks (first 3)
+    
+    # Test HTTP POST requests to Flask server
+    test_http_post_request()                # Single HTTP POST request
+    # test_http_post_multiple_requests()    # Multiple HTTP POST requests
+    
     # Test the specific TASE historical case
     # test_specific_tase_historical()
     
@@ -673,18 +869,10 @@ if __name__ == "__main__":
     
     # Comment out other tests for now
     # test_function_with_us_only()
+    # test_function_with_european_stocks()
     # test_function_with_tase_indicators() 
-    test_function_with_mixed_indicators()
+    # test_function_with_mixed_indicators()
     # test_function_with_missing_data()
     # test_function_with_empty_request()
     
-    # Option for interactive testing
-    # choice = input("Would you like to run interactive tests? (y/n): ")
-    # if choice.lower() == 'y':
-    #     interactive_test()
-    
     print("Testing complete!")
-    print("\n💡 TIP: Uncomment the test functions above to run specific tests:")
-    print("   - test_tase_current_price_only() for TASE fast current prices")
-    print("   - test_tase_historical_only() for TASE historical data")  
-    print("   - test_yfinance_only() for US stock data from YFinance")
