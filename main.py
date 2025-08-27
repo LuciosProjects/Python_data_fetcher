@@ -71,14 +71,7 @@ def python_data_fetch():
     # Check environment variable to determine if running in production
     if Constants.PRODUCTION:
         # In production (cloud), return jsonify directly
-        for _ in range(Constants.MAX_ATTEMPTS):
-            try:
-                Utilities.random_delay()
-                return jsonify(output)
-            except Exception as e:
-                print(f"Attempt failed: {e}")
-
-        return jsonify({"status": "error", "message": "Failed to jsonify data after multiple attempts"})
+        return jsonify(output)
     else:
         # In development, you can use make_response for more control or debugging
         return json.dumps(output)

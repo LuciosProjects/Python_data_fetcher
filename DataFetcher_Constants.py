@@ -11,18 +11,23 @@ class E_FetchType(Enum):
 
 
 # General Constants for Data Fetcher
-VERSION                = "1.2.1" # Version of the Data Fetcher
+VERSION                = "1.2.3" # Version of the Data Fetcher
 PRODUCTION             = True    # Set to True for production environment
 
 DEBUG_MODE             = False   # When True, browser will be visible for debugging
 BYPASS_ASYNC_CHECKUP   = False   # Bypass async checkup for debugging
 
-API_CALL_DELAY         = 0.2  # Delay in seconds between API calls
-API_CALL_DELAY_STD     = 0.01  # Standard delay for API calls
+# Concurrency Control
+MAX_CONCURRENT_BROWSERS = 4      # Maximum concurrent browser instances (Selenium)
+MAX_CONCURRENT_REQUESTS = 5      # Maximum concurrent API requests (YFinance)
 
-MAX_ATTEMPTS            = 3 # Maximum attempts to fetch data
-INITIAL_DAYS_HALF_SPAN  = 5 # Maximum days to look back & forward for data
-HALF_SPAN_INCREMENT     = 5 # Increment for looking back/forward days
+API_SINGLE_TICKER_TIMEOUT   = 20    # Timeout for single ticker API calls (increased for better reliability)
+API_CALL_DELAY              = 0.3   # Delay in seconds between API calls (increased to avoid rate limits)
+API_CALL_DELAY_STD          = 0.01  # Standard delay for API calls
+
+MAX_ATTEMPTS                = 3     # Maximum attempts to fetch data
+INITIAL_DAYS_HALF_SPAN      = 5     # Maximum days to look back & forward for data
+HALF_SPAN_INCREMENT         = 5     # Increment for looking back/forward days
 
 GENERAL_DATE_FORMAT     = "%m/%d/%Y"  # General date format used across the application
 

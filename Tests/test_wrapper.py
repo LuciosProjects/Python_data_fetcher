@@ -16,6 +16,8 @@ import requests
 import threading
 import time
 
+random.seed(0) # Set seed for reproducibility
+
 from unittest.mock import Mock, MagicMock
 from main import collect_financial_data, app
 
@@ -33,7 +35,32 @@ class TestDataConstructor:
     EUROPEAN_SYMBOLS = ['ASML', 'SAP', 'NESN.SW', 'ROG.SW', 'NOVN.SW', 'MC.PA', 'OR.PA', 'SAN.PA', 'INGA.AS', 'SIE.DE']
     TASE_INDICATORS = ["5138094", "1104249", "1144633", "1183441", \
                         "5111422", "5117379", "1159094", "1159169", "1186063"]
-    
+    FIFTY_INDICATORS = [ 
+        # Major US Tech Stocks (10)
+        'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'NFLX', 'ADBE', 'CRM',
+
+        # US Financial Sector (5)
+        'JPM', 'BAC', 'WFC', 'GS', 'MS',
+
+        # US Healthcare & Pharma (5)
+        'JNJ', 'PFE', 'UNH', 'ABBV', 'MRK',
+
+        # US Energy & Utilities (5)
+        'XOM', 'CVX', 'COP', 'EOG', 'SLB',
+
+        # US Consumer & Retail (5)
+        'WMT', 'HD', 'PG', 'KO', 'PEP',
+
+        # Israeli Stocks - Tel Aviv Stock Exchange (10)
+        '1144633', '1081124', '126.1.CHKP', '273011', '746016', '1100007', '695437', '1119478', '126.1.FSLR', '1101534',
+
+        # European Stocks (5)
+        'ASML', 'SAP', 'NESN.SW', 'ROG.SW', 'NOVN.SW',
+
+        # Asian Stocks (5)
+        'TSM', 'BABA', 'JD', 'NIO', 'BIDU'
+    ]
+
     @classmethod
     def create_test_data(cls, data_type="missing", how_many_each=None, random_choice=True, custom_indicators=None, targetDate=None, **kwargs):
         """
@@ -99,7 +126,10 @@ class TestDataConstructor:
         
         elif data_type == "custom" and custom_indicators:
             base_data["indicators"] = custom_indicators
-        
+
+            if random_choice:
+                random.shuffle(base_data["indicators"])
+
         elif data_type == "empty":
             base_data["indicators"] = []
         
@@ -435,6 +465,32 @@ def test_function_with_custom_data():
     print(f"Response: {response}")
     print("-" * 50)
 
+def test_function_with_large_custom_data():
+    """Test the function with custom security indicators and additional features."""
+    print("Testing with custom security indicators and additional features...")
+    
+    SpacerLen = 30
+
+    # # Test alot of symbols for today's price
+    # test_data = TestDataConstructor.create_test_data("custom", 
+    #     custom_indicators=TestDataConstructor.FIFTY_INDICATORS,
+    # )
+
+    # print("=" * SpacerLen + " Starting http request " + "=" * SpacerLen)
+    # test_http_post_request(test_data)
+    # print("=" * SpacerLen + " Finished http request " + "=" * SpacerLen)
+
+    # Test alot of symbols for historical price
+    test_data = TestDataConstructor.create_test_data("custom", 
+        custom_indicators=TestDataConstructor.FIFTY_INDICATORS,
+        targetDate="05/20/2000",
+    )
+
+    print("=" * SpacerLen + " Starting http request " + "=" * SpacerLen)
+    test_http_post_request(test_data)
+    print("=" * SpacerLen + " Finished http request " + "=" * SpacerLen)
+
+    print("=" * SpacerLen + " Test End " + "=" * SpacerLen)
 
 def test_function_with_european_stocks():
     """Test the function with European stock symbols only."""
@@ -642,7 +698,7 @@ def test_yfinance_only():
     print("="*60)
     
     # Test data for YFinance
-    test_data = TestDataConstructor.create_test_data("us_only", targetDate="01/01/2024")
+    test_data = TestDataConstructor.create_test_data("us", targetDate="01/01/2024")
     
     start_time = timeit.default_timer()
     
@@ -675,7 +731,7 @@ def start_flask_server():
         print(f"❌ Flask server error: {e}")
 
 
-def test_http_post_request():
+def test_http_post_request(test_data = None):
     """Test the Flask app via HTTP POST request."""
     print("\n" + "="*60)
     print("🌐 TESTING: HTTP POST Request to Flask Server")
@@ -705,10 +761,11 @@ def test_http_post_request():
         return
     
     # Test data
-    test_data = TestDataConstructor.create_test_data("mixed", 
-                                                     targetDate="01/15/2024", 
-                                                     how_many_each=3)
-    
+    if test_data == None:
+        test_data = TestDataConstructor.create_test_data("mixed", 
+                                                         targetDate="01/15/2024", 
+                                                         how_many_each=3)
+
     # Flask endpoint URL
     url = "http://127.0.0.1:5000/"
     
@@ -841,6 +898,7 @@ if __name__ == "__main__":
     print("=" * 60)
     print("Testing Local Data Fetcher API (Direct Function Calls)")
     print("Security Indicators Test Suite")
+    print(f"python_data_fetcher version {Constants.VERSION}")
     print(f"Debug mode is set to {Constants.DEBUG_MODE}")
     print(f"Async bypass is set to {Constants.BYPASS_ASYNC_CHECKUP}")
     print("=" * 60)
@@ -855,9 +913,12 @@ if __name__ == "__main__":
     # test_function_with_limited_european_stocks() # Limited European stocks (first 3)
     
     # Test HTTP POST requests to Flask server
-    test_http_post_request()                # Single HTTP POST request
-    # test_http_post_multiple_requests()    # Multiple HTTP POST requests
-    
+    # test_http_post_request()                # Single HTTP POST request
+    # test_http_post_multiple_requests()      # Multiple HTTP POST requests
+
+    # Large scale testing
+    test_function_with_large_custom_data()
+
     # Test the specific TASE historical case
     # test_specific_tase_historical()
     
