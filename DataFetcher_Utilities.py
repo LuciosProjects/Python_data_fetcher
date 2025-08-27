@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 import requests
 from bs4 import BeautifulSoup
+import yfinance as yf
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
@@ -183,6 +184,20 @@ def safe_extract_date_obj(date_obj):
     except:
         return date_obj
     
+def extract_info_data(request: fetchRequest, ticker: yf.Ticker):
+    try:
+        if ticker: 
+            info = ticker.info
+            request.name = info.get("longName", str(request.indicator))
+            request.expense_rate = info.get("netExpenseRatio", 0.0)
+            request.currency = info.get("financialCurrency", info.get("currency", "USD"))
+        else:
+            request.name = str(request.indicator)
+            request.currency = "USD"
+    except Exception:
+        request.name = str(request.indicator)
+        request.currency = "USD"
+
 def random_delay(min_seconds=Constants.API_CALL_DELAY - 0.05, max_seconds=Constants.API_CALL_DELAY + 0.05):
     """
     Add a random delay to simulate human behavior.
@@ -238,7 +253,7 @@ def make_fetch_caches(fetcher_data: dict, fetch_types: list) -> tuple[list, list
         if fetch_types[i] == E_FetchType.YFINANCE:
             YFinance_fetch_cache.append((i, request))
         elif fetch_types[i] == E_FetchType.TASE_FAST:
-            request.actual_date = target_date
+            request.actual_date = pd.to_datetime(target_date)
             TASE_Fast_fetch_cache.append((i, request))
         elif fetch_types[i] == E_FetchType.TASE_HISTORICAL:
             TASE_Historical_fetch_cache.append((i, request))
@@ -271,7 +286,8 @@ def has_tase_indicators(indicators: list[str]) -> tuple[bool, list[bool]]:
         bool: True if any indicator is a TASE indicator, False otherwise.
     """
 
-    is_tase_indicators = [indicator.isdigit() for indicator in indicators]
+    is_tase_indicators = [indicator.isdigit() or indicator.startswith("126.") 
+                          for indicator in indicators]
     return any(is_tase_indicators), is_tase_indicators
 
 def extract_security_name_from_html(html: str) -> str:
@@ -320,10 +336,10 @@ def get_expense_rate(soup: BeautifulSoup) -> float:
     all_text = soup.get_text() 
 
     # The actual expense rate components are stored here
-    expense_secondary_patterns = {  'standard': ['ניהול', 0],
-                                    'trustee': ['נאמן', 0],
-                                    'trustee_diff': ['ניהול משתנים', 0],
-                                    'trustee_actual': ['ניהול משתנים בפועל', 0]}
+    expense_secondary_patterns = {  'standard': ['ניהול', 0.0],
+                                    'trustee': ['נאמן', 0.0],
+                                    'trustee_diff': ['ניהול משתנים', 0.0],
+                                    'trustee_actual': ['ניהול משתנים בפועל', 0.0]}
 
     matches = re.finditer(Constants.EXPENSE_PATTERNS['main'], all_text, re.IGNORECASE)
 
@@ -360,152 +376,164 @@ def get_expense_rate(soup: BeautifulSoup) -> float:
 
     return expense_rate
 
-async def fetch_historical_data_enhanced_with_dedicated_browser(request: fetchRequest) -> bool:
+def determine_tase_currency(indicator: str) -> str:
     """
-    Async version using dedicated browser instance for true parallelization.
-    Each task gets its own WebDriver to avoid race conditions completely!
+    Determine the currency for a specific TASE indicator.
     """
+
+    if indicator.isdigit():
+        return 'ILS'
+    elif indicator.startswith("126."):
+        return 'USD'
+
+    return 'USD' # Default will be USD
+
+# async def fetch_historical_data_enhanced_with_dedicated_browser(request: fetchRequest) -> bool:
+#     """
+#     Async version using dedicated browser instance for true parallelization.
+#     Each task gets its own WebDriver to avoid race conditions completely!
+#     """
     
-    # Create a dedicated browser instance for this task
-    dedicated_browser = SilentBrowser(headless=True)
+#     # Create a dedicated browser instance for this task
+#     dedicated_browser = SilentBrowser(headless=True)
     
-    try:
-        url = Constants.BASE_TASE_URL(request.indicator)
+#     try:
+#         url = Constants.BASE_TASE_URL(request.indicator)
         
-        # Navigate to page with dedicated browser
-        if not dedicated_browser.navigate_to(url):
-            request.message = "Failed to navigate to page for historical data"
-            return False
+#         # Navigate to page with dedicated browser
+#         if not dedicated_browser.navigate_to(url):
+#             request.message = "Failed to navigate to page for historical data"
+#             return False
         
-        # Wait for page to fully load
-        dedicated_browser._random_delay(Constants.TASE_PAGELOAD_DELAYS[0], Constants.TASE_PAGELOAD_DELAYS[1])
+#         # Wait for page to fully load
+#         dedicated_browser._random_delay(Constants.TASE_PAGELOAD_DELAYS[0], Constants.TASE_PAGELOAD_DELAYS[1])
         
-        # Get security name
-        name_element = dedicated_browser.driver.find_element(By.XPATH, '/html/body/div[1]/div[4]/main/div/div[1]/div[1]/div/h2')
-        if name_element:
-            request.name = name_element.text.strip()
-        else:
-            request.name = ""
+#         # Get security name
+#         name_element = dedicated_browser.driver.find_element(By.XPATH, '/html/body/div[1]/div[4]/main/div/div[1]/div[1]/div/h2')
+#         if name_element:
+#             request.name = name_element.text.strip()
+#         else:
+#             request.name = ""
 
-        # Navigate graph to present the maximum timespan
-        try:
-            element = dedicated_browser.driver.find_element(By.XPATH, "/html/body/div[1]/div[4]/main/div/div[1]/div[4]/div/div/ul/li[6]/button")
+#         # Navigate graph to present the maximum timespan
+#         try:
+#             element = dedicated_browser.driver.find_element(By.XPATH, "/html/body/div[1]/div[4]/main/div/div[1]/div[4]/div/div/ul/li[6]/button")
 
-            if element and element.is_displayed() and element.is_enabled():
-                dedicated_browser.driver.execute_script("arguments[0].click();", element)
-                dedicated_browser._random_delay(Constants.TASE_CHART_DELAYS[0], Constants.TASE_CHART_DELAYS[1])
-            else:
-                request.message = "Chart timespan button not available or not interactable"
-                return False
-        except Exception as e:
-            request.message = f"Exception while finding chart timespan button: {str(e)}"
-            return False
+#             if element and element.is_displayed() and element.is_enabled():
+#                 dedicated_browser.driver.execute_script("arguments[0].click();", element)
+#                 dedicated_browser._random_delay(Constants.TASE_CHART_DELAYS[0], Constants.TASE_CHART_DELAYS[1])
+#             else:
+#                 request.message = "Chart timespan button not available or not interactable"
+#                 return False
+#         except Exception as e:
+#             request.message = f"Exception while finding chart timespan button: {str(e)}"
+#             return False
 
-        target_date = pd.to_datetime(request.actual_date, dayfirst=True)
-        try:
-            # From this point we assume the max span is successfully pressed
+#         target_date = pd.to_datetime(request.actual_date, dayfirst=True)
+#         try:
+#             # From this point we assume the max span is successfully pressed
 
-            # Find target date
-            date_element = dedicated_browser.driver.find_element(By.XPATH, "/html/body/div[1]/div[4]/main/div/div[1]/div[4]/div/div/div/div[2]/div[1]/span[2]")
-            price_element = dedicated_browser.driver.find_element(By.XPATH, "/html/body/div[1]/div[4]/main/div/div[1]/div[4]/div/div/div/div[2]/div[2]/span[2]")
-            datatip_container = dedicated_browser.driver.find_element(By.CSS_SELECTOR, \
-                                                            "#graph-year5 > div:nth-child(1) > svg > g:nth-child(1)") \
-                                                            .find_elements(By.XPATH, "./*")
+#             # Find target date
+#             date_element = dedicated_browser.driver.find_element(By.XPATH, "/html/body/div[1]/div[4]/main/div/div[1]/div[4]/div/div/div/div[2]/div[1]/span[2]")
+#             price_element = dedicated_browser.driver.find_element(By.XPATH, "/html/body/div[1]/div[4]/main/div/div[1]/div[4]/div/div/div/div[2]/div[2]/span[2]")
+#             datatip_container = dedicated_browser.driver.find_element(By.CSS_SELECTOR, \
+#                                                             "#graph-year5 > div:nth-child(1) > svg > g:nth-child(1)") \
+#                                                             .find_elements(By.XPATH, "./*")
             
-            # Initialize ActionChains before the loop
-            actions = ActionChains(dedicated_browser.driver)
+#             # Initialize ActionChains before the loop
+#             actions = ActionChains(dedicated_browser.driver)
 
-            # Move to the earliest datatip in the chart
-            actions.move_to_element(datatip_container[0]).perform()
-            dedicated_browser._random_delay(Constants.TASE_ELEMENT_DELAYS[0], Constants.TASE_ELEMENT_DELAYS[1])  # Allow UI to update
+#             # Move to the earliest datatip in the chart
+#             actions.move_to_element(datatip_container[0]).perform()
+#             dedicated_browser._random_delay(Constants.TASE_ELEMENT_DELAYS[0], Constants.TASE_ELEMENT_DELAYS[1])  # Allow UI to update
 
-            current_date = pd.to_datetime(date_element.text, dayfirst=True)
+#             current_date = pd.to_datetime(date_element.text, dayfirst=True)
 
-            if current_date > target_date:
-                # Earliest date is after target date, searching is unnecessary
-                request.actual_date = current_date.strftime(Constants.THEMARKER_DATE_FORMAT)
-                request.fetched_price = float(price_element.text)/100.0
-                request.message = f"Target date {target_date.strftime(Constants.GENERAL_DATE_FORMAT)} is after available data. Using earliest available."
+#             if current_date > target_date:
+#                 # Earliest date is after target date, searching is unnecessary
+#                 request.actual_date = current_date.strftime(Constants.THEMARKER_DATE_FORMAT)
+#                 request.fetched_price = float(price_element.text)/100.0
+#                 request.message = f"Target date {target_date.strftime(Constants.GENERAL_DATE_FORMAT)} is after available data. Using earliest available."
 
-                return True
-            else:
-                # Smart heuristic search - your brilliant approach!
-                N_DataTips = len(datatip_container)
-                span_delta_days = (date.today() - current_date.date()).days
-                min_delta_days = span_delta_days
+#                 return True
+#             else:
+#                 # Smart heuristic search - your brilliant approach!
+#                 N_DataTips = len(datatip_container)
+#                 span_delta_days = (date.today() - current_date.date()).days
+#                 min_delta_days = span_delta_days
                 
-                # Calculate proportional position based on date range
-                initial_guess = int(float((target_date - current_date).days) / span_delta_days * N_DataTips)
-                initial_guess = max(0, min(initial_guess, N_DataTips - 1))  # Clamp to valid range
+#                 # Calculate proportional position based on date range
+#                 initial_guess = int(float((target_date - current_date).days) / span_delta_days * N_DataTips)
+#                 initial_guess = max(0, min(initial_guess, N_DataTips - 1))  # Clamp to valid range
                 
-                # Track visited elements to avoid redundant checks
-                visited = set()
-                best_match_date = request.date
-                best_match_price = request.fetched_price
+#                 # Track visited elements to avoid redundant checks
+#                 visited = set()
+#                 best_match_date = request.date
+#                 best_match_price = request.fetched_price
                 
-                # Start from the smart initial guess
-                current_idx = initial_guess
+#                 # Start from the smart initial guess
+#                 current_idx = initial_guess
                 
-                while current_idx not in visited and 0 <= current_idx < N_DataTips:
-                    visited.add(current_idx)
+#                 while current_idx not in visited and 0 <= current_idx < N_DataTips:
+#                     visited.add(current_idx)
                     
-                    # Move to element and get data
-                    actions.move_to_element(datatip_container[current_idx]).perform()
-                    dedicated_browser._random_delay(Constants.TASE_ELEMENT_DELAYS[0], Constants.TASE_ELEMENT_DELAYS[1])
+#                     # Move to element and get data
+#                     actions.move_to_element(datatip_container[current_idx]).perform()
+#                     dedicated_browser._random_delay(Constants.TASE_ELEMENT_DELAYS[0], Constants.TASE_ELEMENT_DELAYS[1])
                     
-                    current_date = pd.to_datetime(date_element.text, dayfirst=True)
-                    temp_delta_days = abs((current_date - target_date).days)
+#                     current_date = pd.to_datetime(date_element.text, dayfirst=True)
+#                     temp_delta_days = abs((current_date - target_date).days)
                     
-                    # Update best match if closer
-                    if temp_delta_days < min_delta_days:
-                        min_delta_days      = temp_delta_days
-                        best_match_date     = current_date.strftime(Constants.THEMARKER_DATE_FORMAT)
-                        best_match_price    = float(price_element.text.replace(",", ""))/100.0
+#                     # Update best match if closer
+#                     if temp_delta_days < min_delta_days:
+#                         min_delta_days      = temp_delta_days
+#                         best_match_date     = current_date.strftime(Constants.THEMARKER_DATE_FORMAT)
+#                         best_match_price    = float(price_element.text.replace(",", ""))/100.0
                     
-                    # Perfect match found
-                    if temp_delta_days == 0:
-                        break
+#                     # Perfect match found
+#                     if temp_delta_days == 0:
+#                         break
                     
-                    # Smart directional search based on date comparison
-                    if current_date < target_date:
-                        # Target is later, move forward in chart
-                        current_idx += 1
-                    elif current_date > target_date:
-                        # Target is earlier, move backward in chart  
-                        current_idx -= 1
-                    else:
-                        # Target is the same, reset to initial guess
-                        current_idx = initial_guess
-                        break
+#                     # Smart directional search based on date comparison
+#                     if current_date < target_date:
+#                         # Target is later, move forward in chart
+#                         current_idx += 1
+#                     elif current_date > target_date:
+#                         # Target is earlier, move backward in chart  
+#                         current_idx -= 1
+#                     else:
+#                         # Target is the same, reset to initial guess
+#                         current_idx = initial_guess
+#                         break
 
-                    # Safety check: if we've visited too many elements, break
-                    if len(visited) > min(20, N_DataTips // 2):  # Limit search scope
-                        break
+#                     # Safety check: if we've visited too many elements, break
+#                     if len(visited) > min(20, N_DataTips // 2):  # Limit search scope
+#                         break
 
-                request.actual_date     = best_match_date
-                request.fetched_price   = best_match_price
-                request.message         = f"Found best match for target date {request.date}."
+#                 request.actual_date     = best_match_date
+#                 request.fetched_price   = best_match_price
+#                 request.message         = f"Found best match for target date {request.date}."
 
-                if not request.fetched_price:
-                    request.message = "Could not extract price from chart"
-                    return False
+#                 if not request.fetched_price:
+#                     request.message = "Could not extract price from chart"
+#                     return False
                 
-                return True
-        except Exception as e:
-            request.message = "Could not find any valid data points in chart"
-            return False
+#                 return True
+#         except Exception as e:
+#             request.message = "Could not find any valid data points in chart"
+#             return False
         
-    except Exception as e:
-        request.message = f"Error in dedicated browser historical fetch: {str(e)}"
-        return False
+#     except Exception as e:
+#         request.message = f"Error in dedicated browser historical fetch: {str(e)}"
+#         return False
     
-    finally:
-        # Always cleanup the dedicated browser
-        try:
-            if dedicated_browser and hasattr(dedicated_browser, 'driver') and dedicated_browser.driver:
-                dedicated_browser.close()
-        except Exception as cleanup_error:
-            print(f"Warning: Error during dedicated browser cleanup: {cleanup_error}")
+#     finally:
+#         # Always cleanup the dedicated browser
+#         try:
+#             if dedicated_browser and hasattr(dedicated_browser, 'driver') and dedicated_browser.driver:
+#                 dedicated_browser.close()
+#         except Exception as cleanup_error:
+#             print(f"Warning: Error during dedicated browser cleanup: {cleanup_error}")
 
 # Async functions
 def should_use_async_in_cloud(indicators: list) -> bool:

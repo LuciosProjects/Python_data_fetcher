@@ -7,8 +7,10 @@ import asyncio
 from typing import List
 import logging
 import os
+import pandas as pd
 
 import DataFetcher_Utilities as Utilities
+import DataFetcher_Constants as Constants
 from DataFetcher_Utilities import fetchRequest, FLAGS
 
 from DF_TheMarker import fetch_tase_fast, fetch_tase_historical
@@ -21,58 +23,69 @@ logging.getLogger('yfinance').setLevel(logging.CRITICAL)
 GCF_MAX_CONCURRENT = int(os.environ.get("GCF_MAX_CONCURRENT", "5"))  # Limit concurrent connections
 GCF_TIMEOUT = int(os.environ.get("GCF_TIMEOUT", "30"))  # Shorter timeout for cloud
 GCF_CONNECTOR_LIMIT = int(os.environ.get("GCF_CONNECTOR_LIMIT", "10"))  # Connection pool limit
+
+# Override constants with environment variables if available (for Cloud Run tuning)
+MAX_BROWSERS = min([int(os.environ.get("MAX_BROWSERS", str(Constants.MAX_CONCURRENT_BROWSERS))), Constants.MAX_CONCURRENT_BROWSERS])
+MAX_REQUESTS = min([int(os.environ.get("MAX_REQUESTS", str(Constants.MAX_CONCURRENT_REQUESTS))), Constants.MAX_CONCURRENT_REQUESTS])
+
+# Concurrency control semaphores - will be created fresh for each request to avoid event loop conflicts
     
 # Async Caller Functions - Use Dedicated Browsers for True Parallelization
-async def fetch_yfinance_data_async(requests: List[fetchRequest]) -> List[fetchRequest]:
+async def fetch_yfinance_data_async(requests: List[fetchRequest], request_semaphore: asyncio.Semaphore) -> List[fetchRequest]:
     """
     Async caller for YFinance data fetching.
+    Limited by semaphore to control concurrent API requests.
     """
-    try:
-        loop = asyncio.get_event_loop()
-        # Run the sync YFinance function in executor (no browser needed)
-        await loop.run_in_executor(None, fetch_yfinance_data, requests)
 
-    except Exception as e:
-        for request in requests:
-            request.fetched_price = None
-            request.success = False
-            request.message = f"Error in async YFinance fetch: {str(e)}"
+    async with request_semaphore:  # Limit concurrent API requests
+        try:
+            loop = asyncio.get_event_loop()
+            # Run the sync YFinance function in executor (no browser needed)
+            await loop.run_in_executor(None, fetch_yfinance_data, requests)
+
+        except Exception as e:
+            for request in requests:
+                request.fetched_price = None
+                request.success = False
+                request.message = f"Error in async YFinance fetch: {str(e)}"
 
     return requests
 
-async def fetch_tase_fast_price_async(request: fetchRequest) -> fetchRequest:
+async def fetch_tase_fast_price_async(request: fetchRequest, request_semaphore: asyncio.Semaphore) -> fetchRequest:
     """
     Async caller for TASE current price fetching using fast requests method.
+    Limited by semaphore to control concurrent requests.
     """
-    try:
-        loop = asyncio.get_event_loop()
-        # Run the sync current price function in executor (no browser needed)
-        await loop.run_in_executor(None, fetch_tase_fast, request)
-    except Exception as e:
-        request.success = False
-        request.message = f"Error in async TASE current price fetch: {str(e)}"
+    async with request_semaphore:  # Limit concurrent API requests
+        try:
+            loop = asyncio.get_event_loop()
+            # Run the sync current price function in executor (no browser needed)
+            await loop.run_in_executor(None, fetch_tase_fast, request)
+        except Exception as e:
+            request.success = False
+            request.message = f"Error in async TASE current price fetch: {str(e)}"
 
     return request
 
-async def fetch_tase_historical_data_async(request: fetchRequest) -> fetchRequest:
+async def fetch_tase_historical_data_async(request: fetchRequest, browser_semaphore: asyncio.Semaphore) -> fetchRequest:
     """
     Async caller for TASE historical data with DEDICATED browser instance.
-    Each call gets its own browser - no race conditions!
+    Limited by semaphore to control concurrent browser instances.
     """
-    
-    try:
-        # Run the sync function in executor for true parallelism
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, fetch_tase_historical, request)
-    except Exception as e:
-        request.success = False
-        request.message = f"Error in async TASE historical fetch: {str(e)}"
+    async with browser_semaphore:  # Limit concurrent browser instances
+        try:
+            # Run the sync function in executor for true parallelism
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, fetch_tase_historical, request)
+        except Exception as e:
+            request.success = False
+            request.message = f"Error in async TASE historical fetch: {str(e)}"
 
     return request
 
 async def fetch_indicators_async(fetcher_data) -> List[fetchRequest]:
     """
-    Async fetch multiple indicators in parallel.
+    Async fetch multiple indicators in parallel with concurrency limits.
     
     Args:
         fetcher_data: Dictionary containing indicators and date
@@ -80,7 +93,10 @@ async def fetch_indicators_async(fetcher_data) -> List[fetchRequest]:
     Returns:
         List of completed fetchRequest objects
     """
-    
+
+    # Create fresh semaphores for this request to avoid event loop conflicts
+    request_semaphore = asyncio.Semaphore(MAX_REQUESTS)
+    browser_semaphore = asyncio.Semaphore(MAX_BROWSERS)
 
     # Categorize indicators
     N_indicators = len(fetcher_data["data"]["indicators"])
@@ -93,22 +109,24 @@ async def fetch_indicators_async(fetcher_data) -> List[fetchRequest]:
     # Process async groups in parallel
     tasks = []
     
-    # YFinance tasks (fully parallel)
+    # YFinance tasks (single batch with all requests)
     if FLAGS.NEED_YFINANCE:
         yf_requests = [YFinance_fetch_cache[i][1] for i in range(len(YFinance_fetch_cache))]
-        task = asyncio.create_task(fetch_yfinance_data_async(yf_requests))
-        tasks.append((None, task, 'yfinance'))
+        task = asyncio.create_task(fetch_yfinance_data_async(yf_requests, request_semaphore))
+        tasks.append((None, task, 'yfinance_all'))
 
     # TASE fast tasks (fully parallel)
     if FLAGS.NEED_TASE_FAST:
         for idx, request in TASE_Fast_fetch_cache:
-            task = asyncio.create_task(fetch_tase_fast_price_async(request))
-            tasks.append((idx, task, 'tase_fast'))
+            task = asyncio.create_task(fetch_tase_fast_price_async(request, request_semaphore))
+            tasks.append((idx, task, f'tase_fast_{request.indicator}'))
 
     if FLAGS.NEED_HISTORICAL:
         for idx, request in TASE_Historical_fetch_cache:
-            task = asyncio.create_task(fetch_tase_historical_data_async(request))
-            tasks.append((idx, task, 'tase_historical'))
+            request.date = pd.to_datetime(request.date).strftime(Constants.THEMARKER_DATE_FORMAT)
+
+            task = asyncio.create_task(fetch_tase_historical_data_async(request, browser_semaphore))
+            tasks.append((idx, task, f'tase_historical_{request.indicator}'))
     
     # Await all async tasks to ensure completion (no need to gather results)
     if tasks:
@@ -164,63 +182,62 @@ async def data_fetcher_manager_async(fetcher_data):
 def run_async_data_fetch(fetcher_data):
     """
     Run async data fetching optimized for Google Cloud Functions.
-    Always starts with a clean event loop to avoid conflicts.
+    Uses simplified event loop management with proper cleanup.
     """
-
-    # STEP 1: Clean up any existing loops aggressively
+    
+    created_new_loop = False
+    
     try:
-        # Check if there's an existing loop
+        # Try to get existing loop first
         try:
-            existing_loop = asyncio.get_event_loop()
-            if existing_loop and not existing_loop.is_closed():
-                # Cancel all pending tasks
-                pending_tasks = asyncio.all_tasks(existing_loop)
-                if pending_tasks:
-                    for task in pending_tasks:
-                        task.cancel()
-
-                # Close the existing loop
-                existing_loop.close()
-
+            loop = asyncio.get_running_loop()
+            # If we're already in an event loop, we need to handle this differently
+            # This shouldn't happen in Cloud Run but let's be safe
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, data_fetcher_manager_async(fetcher_data))
+                future.result()
         except RuntimeError:
-            # No existing loop or already closed - this is fine
-            pass
+            # No running loop, which is the normal case for Cloud Run
+            # Create and run our own loop
+            created_new_loop = True
+            asyncio.run(data_fetcher_manager_async(fetcher_data))
+            
     except Exception as e:
         fetcher_data["status"] = "failed"
-        fetcher_data["message"] = f"Error during loop cleanup: {e}"
+        fetcher_data["message"] = f"Async execution failed: {str(e)}"
         FLAGS.ASYNC_FAILED = True
-
-    # Step 2: Create a fresh event loop for this invocation
-    try:
-        # Always create a new, clean event loop for GCF
-        new_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(new_loop)
-
-        # STEP 3: Run our async function with the clean loop
-        try:
-            new_loop.run_until_complete(data_fetcher_manager_async(fetcher_data))
-        except Exception as e:
-            fetcher_data["status"] = "failed"
-            fetcher_data["message"] = f"Async execution failed: {e}"
-            FLAGS.ASYNC_FAILED = True
-    except Exception as e:
-        fetcher_data["status"] = "failed"
-        fetcher_data["message"] = f"Critical async error: {e}"
-        FLAGS.ASYNC_FAILED = True
+    
     finally:
-        # Step 4: Clean up the event loop
-        try:
-            current_loop = asyncio.get_event_loop()
-            if current_loop and not current_loop.is_closed():
-                # Cancel any remaining tasks
-                pending_tasks = asyncio.all_tasks(current_loop)
-                if pending_tasks:
-                    for task in pending_tasks:
-                        task.cancel()
-
-                # Close the existing loop
-                current_loop.close()
-
-        except Exception as e:
-            fetcher_data["status"] = "failed"
-            fetcher_data["message"] = f"Error during final cleanup: {e}"
+        # Clean up our own loop if we created one
+        if created_new_loop:
+            try:
+                # Get the loop we just used (if it still exists)
+                try:
+                    current_loop = asyncio.get_event_loop()
+                    
+                    # Only clean up if it's not running (asyncio.run should have closed it)
+                    if current_loop.is_closed():
+                        # Loop is already closed by asyncio.run - good!
+                        pass
+                    else:
+                        # Unusual case - clean up any remaining tasks
+                        pending_tasks = [task for task in asyncio.all_tasks(current_loop) 
+                                       if not task.done()]
+                        if pending_tasks:
+                            # Cancel only our remaining tasks
+                            for task in pending_tasks:
+                                task.cancel()
+                        
+                        # Let the loop finish cleanly
+                        if not current_loop.is_closed():
+                            current_loop.close()
+                            
+                except RuntimeError:
+                    # No loop to clean up - this is fine
+                    pass
+                    
+            except Exception as cleanup_error:
+                # Don't let cleanup errors affect the main result
+                # Just log it if we had logging
+                pass

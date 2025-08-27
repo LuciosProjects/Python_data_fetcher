@@ -26,7 +26,8 @@ def fetch_tase_fast(request: fetchRequest):
     
     url = Constants.BASE_TASE_URL(request.indicator)
 
-    request.currency = 'ILS'
+    request.currency = Utilities.determine_tase_currency(request.indicator)
+
     for attempt in range(Constants.MAX_ATTEMPTS):
         try:
             if FLAGS.ASYNC_MODE:
@@ -98,7 +99,9 @@ def fetch_tase_historical(request: fetchRequest):
 
     url = Constants.BASE_TASE_URL(request.indicator)
 
-    request.currency = 'ILS'
+    request.currency = Utilities.determine_tase_currency(request.indicator)
+
+    browser = None
     for attempt in range(Constants.MAX_ATTEMPTS):
         try:
             if FLAGS.ASYNC_MODE:
@@ -138,10 +141,10 @@ def fetch_tase_historical(request: fetchRequest):
             expense_element = browser.driver.find_element(By.XPATH, '/html/body/div[1]/div[4]/main/div/div[1]/div[7]/div[2]/div[2]/div/table')
             if expense_element:
                 expense_text        = expense_element.text
-                expenseCategories   = { 'standard': ['ניהול', 0],
-                                        'trustee': ['נאמן', 0],
-                                        'trustee_diff': ['ניהול משתנים', 0],
-                                        'trustee_actual': ['ניהול משתנים בפועל', 0]}
+                expenseCategories   = { 'standard': ['ניהול', 0.0],
+                                        'trustee': ['נאמן', 0.0],
+                                        'trustee_diff': ['ניהול משתנים', 0.0],
+                                        'trustee_actual': ['ניהול משתנים בפועל', 0.0]}
 
                 for category, (label, _) in expenseCategories.items():
                     if label in expense_text:
@@ -201,7 +204,7 @@ def fetch_tase_historical(request: fetchRequest):
                     # Earliest date is after target date, searching is unnecessary
                     request.actual_date = current_date.strftime(Constants.THEMARKER_DATE_FORMAT)
                     request.fetched_price = float(price_element.text.replace(",", ""))/100.0
-                    request.message = f"Target date {target_date.strftime(Constants.GENERAL_DATE_FORMAT)} is after available data. Using earliest available."
+                    request.message = f"Target date {target_date.strftime(Constants.GENERAL_DATE_FORMAT)} is precedes available data. Using earliest available."
 
                     request.success = True
                     break
@@ -267,16 +270,37 @@ def fetch_tase_historical(request: fetchRequest):
                         request.message = "Could not extract price from chart"
                         request.success = False
                         Utilities.add_attempt2msg(request, attempt)
+
+                        if FLAGS.ASYNC_MODE and attempt >= Constants.MAX_ATTEMPTS:
+                            # Make sure to close the browser after use in async mode
+                            request.date = pd.to_datetime(request.date, dayfirst=True).strftime(Constants.GENERAL_DATE_FORMAT)
+                            browser.close()
+
                         continue
                     
+                    if FLAGS.ASYNC_MODE:
+                        # Make sure to close the browser after use in async mode
+                        request.date = pd.to_datetime(request.date, dayfirst=True).strftime(Constants.GENERAL_DATE_FORMAT)
+                        browser.close()
+
                     request.success = True
                     break
             except Exception as e:
                 request.message = "Could not find any valid data points in chart"
                 request.success = False
                 Utilities.add_attempt2msg(request, attempt)
+
+                if FLAGS.ASYNC_MODE and attempt >= Constants.MAX_ATTEMPTS:
+                    request.date = pd.to_datetime(request.date, dayfirst=True).strftime(Constants.GENERAL_DATE_FORMAT)
+
+                    # Make sure to close the browser after use in async mode
+                    browser.close()
                 continue
         except Exception as e:
             request.message = f"Error occurred while fetching historical data: {str(e)}"
             request.success = False
             Utilities.add_attempt2msg(request, attempt)
+
+            if browser is not None:
+                request.date = pd.to_datetime(request.date, dayfirst=True).strftime(Constants.GENERAL_DATE_FORMAT)
+                browser.close()
