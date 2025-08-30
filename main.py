@@ -51,7 +51,6 @@ def python_data_fetch():
         output["status"] = "error"
         output["status_code"] = 400
         output["message"] = "Invalid input structure. Expected format: {'data': {'indicators': [...], 'date': 'MM/DD/YYYY', ...}}"
-
         return jsonify(output)
 
     indicators = request_json["data"].get("indicators", [])

@@ -76,6 +76,7 @@ def fetch_tase_fast(request: fetchRequest):
             request.expense_rate = Utilities.get_expense_rate(soup)
 
             request.message = "Price fetched successfully (fast method)"
+            request.actual_date = date.today().strftime(Constants.GENERAL_DATE_FORMAT)
             request.success = True
             break # after a successful fetch, there's no need for further attempts
         except requests.exceptions.Timeout:
@@ -202,7 +203,7 @@ def fetch_tase_historical(request: fetchRequest):
 
                 if current_date > target_date:
                     # Earliest date is after target date, searching is unnecessary
-                    request.actual_date = current_date.strftime(Constants.THEMARKER_DATE_FORMAT)
+                    request.actual_date = current_date.strftime(Constants.GENERAL_DATE_FORMAT)
                     request.fetched_price = float(price_element.text.replace(",", ""))/100.0
                     request.message = f"Target date {target_date.strftime(Constants.GENERAL_DATE_FORMAT)} is precedes available data. Using earliest available."
 

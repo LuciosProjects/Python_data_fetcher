@@ -23,6 +23,8 @@ from main import collect_financial_data, app
 
 import DataFetcher_Constants as Constants
 
+CLOUD_RUN_URL = "https://python-data-fetch-84442185105.us-central1.run.app"
+
 def prepare_test_data(test_data):
     """Prepare test data for direct function call (no mock request needed)."""
     return test_data["data"]
@@ -174,6 +176,57 @@ def test_function_with_valid_data():
     print(f"Response: {response}")
     print("-" * 50)
 
+def test_cloud_run_service():
+    """
+    Test the deployed Google Cloud Run service by sending a POST request.
+    """
+
+    # If your service requires authentication, set your token here
+    # headers = {"Authorization": "Bearer YOUR_ID_TOKEN"}
+    headers = {"Content-Type": "application/json"}
+
+    # Example payload (adjust as needed)
+    payload = {
+        "data": {
+            "indicators": ['5138094']
+        }
+    }
+    # payload = {
+    #     'data': {
+    #         'indicators': ['AAPL', 'MSFT', 'SCHD', '695437', '5138094', '1081124'],
+    #         'date': '01/19/2024'
+    #     }
+    # }
+
+    response = requests.post(CLOUD_RUN_URL, 
+                             headers=headers, 
+                             data=json.dumps(payload),
+                             timeout=Constants.API_SINGLE_TICKER_TIMEOUT * 6)
+
+    print("Status Code:", response.status_code)
+
+    if response.status_code != 200:
+        print("Error response:", response.text)
+        return
+    else:
+        data = json.JSONDecoder().decode(response.text)
+
+        if data["status_code"] != 200:
+            print(data["message"])
+            return
+        else:
+            fetched_data = data["data"]
+
+            print("")
+            for i, symbol in enumerate(fetched_data["indicators"]):
+                print(f"Indicator: {symbol}")
+                print(f"  Price: {fetched_data['fetched_prices'][i]}")
+                print(f"  Expense Rate: {fetched_data['expense_rates'][i]}")
+                print(f"  Name: {fetched_data['names'][i]}")
+                print(f"  Actual Date: {fetched_data['actual_dates'][i]}")
+                print(f"  Currency: {fetched_data['currencies'][i]}")
+                print(f"  Message: {fetched_data['messages'][i]}")
+                print("")
 
 def test_function_with_missing_data():
     """Test the function with missing 'indicators' field."""
@@ -896,7 +949,7 @@ if __name__ == "__main__":
     Constants.BYPASS_ASYNC_CHECKUP = False  # Bypass async check
 
     print("=" * 60)
-    print("Testing Local Data Fetcher API (Direct Function Calls)")
+    print("Testing Local Data Fetcher API")
     print("Security Indicators Test Suite")
     print(f"python_data_fetcher version {Constants.VERSION}")
     print(f"Debug mode is set to {Constants.DEBUG_MODE}")
@@ -917,7 +970,7 @@ if __name__ == "__main__":
     # test_http_post_multiple_requests()      # Multiple HTTP POST requests
 
     # Large scale testing
-    test_function_with_large_custom_data()
+    # test_function_with_large_custom_data()
 
     # Test the specific TASE historical case
     # test_specific_tase_historical()
@@ -935,5 +988,8 @@ if __name__ == "__main__":
     # test_function_with_mixed_indicators()
     # test_function_with_missing_data()
     # test_function_with_empty_request()
-    
+
+    # Cloud Run service test
+    test_cloud_run_service()
+
     print("Testing complete!")
