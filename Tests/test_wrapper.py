@@ -176,7 +176,7 @@ def test_function_with_valid_data():
     print(f"Response: {response}")
     print("-" * 50)
 
-def test_cloud_run_service():
+def test_cloud_run_service(symbols: list, date = None):
     """
     Test the deployed Google Cloud Run service by sending a POST request.
     """
@@ -188,15 +188,12 @@ def test_cloud_run_service():
     # Example payload (adjust as needed)
     payload = {
         "data": {
-            "indicators": ['5138094']
+            "indicators": symbols,
         }
     }
-    # payload = {
-    #     'data': {
-    #         'indicators': ['AAPL', 'MSFT', 'SCHD', '695437', '5138094', '1081124'],
-    #         'date': '01/19/2024'
-    #     }
-    # }
+
+    if date is not None:
+        payload["data"]["date"] = date
 
     response = requests.post(CLOUD_RUN_URL, 
                              headers=headers, 
@@ -1016,6 +1013,8 @@ if __name__ == "__main__":
     # test_cloud_run_service()
 
     # Test local function with a single symbol
-    test_local_function_single_symbol("CHKP")
+    # test_local_function_single_symbol("1155365")
+    # test service function with single symbol
+    test_cloud_run_service(["1155365"])
 
     print("Testing complete!")

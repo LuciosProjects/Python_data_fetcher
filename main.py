@@ -46,7 +46,9 @@ def python_data_fetch():
 
     # Parse JSON body
     request_json = request.get_json(silent=True)
-    
+
+    print(f"Received request:\n {request_json}")
+
     if not request_json or "data" not in request_json:
         output["status"] = "error"
         output["status_code"] = 400
