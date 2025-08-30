@@ -91,25 +91,32 @@ def collect_financial_data(**kwargs) -> dict:
     # Initialize output dictionary
     output = Utilities.initialize_output_dict()
 
-    # Parse indicators from kwargs
-    indicators = kwargs.get("indicators", None)
+    data = kwargs.get("data", None)
 
-    if indicators is not None:
-        output["data"]["indicators"] = indicators
+    # Parse indicators from kwargs
+    if data is not None:
+        indicators = data.get("indicators", None)
+
+        if indicators is not None:
+            output["data"]["indicators"] = indicators
+        else:
+            output["status"] = "error"
+            output["status_code"] = 400
+            output["message"] = "Invalid input structure."
+
+        # Parse target date from kwargs
+        target_date = data.get("date", None)
+
+        if target_date == None or target_date.strip() == "":
+            output["data"]["date"] = date.today().strftime(Constants.GENERAL_DATE_FORMAT)  # Default to current date if not provided
+        else:
+            output["data"]["date"] = target_date
+
+        data_fetcher_manager(output)
     else:
         output["status"] = "error"
         output["status_code"] = 400
         output["message"] = "Invalid input structure."
-
-    # Parse target date from kwargs
-    target_date = kwargs.get("date", None)
-
-    if target_date == None or target_date.strip() == "":
-        output["data"]["date"] = date.today().strftime(Constants.GENERAL_DATE_FORMAT)  # Default to current date if not provided
-    else:
-        output["data"]["date"] = target_date
-
-    data_fetcher_manager(output)
 
     return output
 

@@ -27,6 +27,7 @@ def fetch_tase_fast(request: fetchRequest):
     url = Constants.BASE_TASE_URL(request.indicator)
 
     request.currency = Utilities.determine_tase_currency(request.indicator)
+    price_denominator = 100.0 if request.currency != "ILS" else 1.0
 
     for attempt in range(Constants.MAX_ATTEMPTS):
         try:
@@ -72,6 +73,9 @@ def fetch_tase_fast(request: fetchRequest):
                 request.success = False
                 Utilities.add_attempt2msg(request, attempt)
                 continue
+            else:
+                # Adjust fetched price based on currency
+                request.fetched_price /= price_denominator
 
             request.expense_rate = Utilities.get_expense_rate(soup)
 
@@ -101,6 +105,7 @@ def fetch_tase_historical(request: fetchRequest):
     url = Constants.BASE_TASE_URL(request.indicator)
 
     request.currency = Utilities.determine_tase_currency(request.indicator)
+    price_denominator = 100.0 if request.currency != "ILS" else 1.0
 
     browser = None
     for attempt in range(Constants.MAX_ATTEMPTS):
@@ -204,7 +209,7 @@ def fetch_tase_historical(request: fetchRequest):
                 if current_date > target_date:
                     # Earliest date is after target date, searching is unnecessary
                     request.actual_date = current_date.strftime(Constants.GENERAL_DATE_FORMAT)
-                    request.fetched_price = float(price_element.text.replace(",", ""))/100.0
+                    request.fetched_price = float(price_element.text.replace(",", ""))/price_denominator
                     request.message = f"Target date {target_date.strftime(Constants.GENERAL_DATE_FORMAT)} is precedes available data. Using earliest available."
 
                     request.success = True
@@ -241,7 +246,7 @@ def fetch_tase_historical(request: fetchRequest):
                         if temp_delta_days < min_delta_days:
                             min_delta_days      = temp_delta_days
                             best_match_date     = current_date.strftime(Constants.GENERAL_DATE_FORMAT)
-                            best_match_price    = float(price_element.text.replace(",", ""))/100.0
+                            best_match_price    = float(price_element.text.replace(",", ""))/price_denominator
                         
                         # Perfect match found
                         if temp_delta_days == 0:

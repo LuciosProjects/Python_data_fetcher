@@ -254,6 +254,29 @@ def test_function_with_empty_request():
     print("-" * 50)
 
 
+def test_local_function_single_symbol(symbol: str):
+    """Test the local function with a single symbol."""
+    print(f"Testing local function with single symbol: {symbol}")
+
+    # Prepare test data
+    test_data = TestDataConstructor.create_test_data("custom", custom_indicators=[symbol])
+
+    response = collect_financial_data(**test_data)
+
+    if response["status"] == "success":
+        print("Local function test passed.")
+
+        print(f"name: {response['data']['names'][0]}")
+        print(f"price: {response['data']['fetched_prices'][0]}")
+        print(f"currency: {response['data']['currencies'][0]}")
+        print(f"expense rate: {response['data']['expense_rates'][0]}")
+        print(f"actual date: {response['data']['actual_dates'][0]}")
+        print(f"message: {response['data']['messages'][0]}")
+    else:
+        print("Local function test failed.")
+
+    print("-" * 50)
+
 def test_function_with_tase_indicators():
     """Test the function with Israeli TASE numeric indicators."""
     print("Testing with Israeli TASE numeric indicators...")
@@ -990,6 +1013,9 @@ if __name__ == "__main__":
     # test_function_with_empty_request()
 
     # Cloud Run service test
-    test_cloud_run_service()
+    # test_cloud_run_service()
+
+    # Test local function with a single symbol
+    test_local_function_single_symbol("CHKP")
 
     print("Testing complete!")
