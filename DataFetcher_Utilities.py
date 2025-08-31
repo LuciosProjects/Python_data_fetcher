@@ -322,7 +322,7 @@ def extract_current_price_from_html(html: str) -> float | None:
     price_element = re.search(r'<span class=".*?">שער</span><span class=".*?">' + Constants.NUMBER_PATTERN + '</span>', html, re.IGNORECASE)
     if price_element:
         try:
-            return float(price_element.group(1).replace(",", ""))/100.0 # Israeli security prices are priced in ILAs
+            return float(price_element.group(1).replace(",", ""))
         except (ValueError, IndexError):
             return None
 

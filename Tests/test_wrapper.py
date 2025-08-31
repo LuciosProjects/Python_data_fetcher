@@ -88,7 +88,7 @@ class TestDataConstructor:
 
         # Default to current date if not provided
         if not targetDate:
-            targetDate = date.today().strftime("%m/%d/%Y") 
+            targetDate = date.today().strftime(Constants.GENERAL_DATE_FORMAT) 
 
         # Base data structure
         base_data = {
@@ -251,12 +251,14 @@ def test_function_with_empty_request():
     print("-" * 50)
 
 
-def test_local_function_single_symbol(symbol: str):
+def test_local_function_single_symbol(symbol: str, date = None):
     """Test the local function with a single symbol."""
     print(f"Testing local function with single symbol: {symbol}")
 
     # Prepare test data
-    test_data = TestDataConstructor.create_test_data("custom", custom_indicators=[symbol])
+    test_data = TestDataConstructor.create_test_data("custom", 
+                                                     custom_indicators=[symbol], 
+                                                     targetDate=date)
 
     response = collect_financial_data(**test_data)
 
@@ -1013,8 +1015,9 @@ if __name__ == "__main__":
     # test_cloud_run_service()
 
     # Test local function with a single symbol
-    # test_local_function_single_symbol("1155365")
+    test_local_function_single_symbol("1155365", "08/30/2022")
     # test service function with single symbol
-    test_cloud_run_service(["1155365"])
+    # test_cloud_run_service(["1155365"], "08/30/2022")
+    # test_cloud_run_service(["1155365"])
 
     print("Testing complete!")

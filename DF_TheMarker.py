@@ -105,7 +105,7 @@ def fetch_tase_historical(request: fetchRequest):
     url = Constants.BASE_TASE_URL(request.indicator)
 
     request.currency = Utilities.determine_tase_currency(request.indicator)
-    price_denominator = 100.0 if request.currency != "ILS" else 1.0
+    price_denominator = 100.0 if request.currency == "ILS" else 1.0
 
     browser = None
     for attempt in range(Constants.MAX_ATTEMPTS):
