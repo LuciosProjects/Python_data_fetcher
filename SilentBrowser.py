@@ -10,7 +10,7 @@ import logging
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
+# from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
@@ -92,10 +92,15 @@ class SilentBrowser:
         chrome_options.add_argument("--silent")
         chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
         chrome_options.add_experimental_option('useAutomationExtension', False)
-        
+        chrome_options.binary_location = "/usr/bin/google-chrome-stable"  # <-- Chrome path
+
         try:
             # Use WebDriver Manager to automatically handle ChromeDriver
-            service = Service(ChromeDriverManager().install())
+            if Constants.PRODUCTION:
+                service = Service('/usr/bin/chromedriver-linux64/chromedriver')
+            else:
+                service = Service(ChromeDriverManager().install())
+                
             self.driver: webdriver.Chrome = webdriver.Chrome(service=service, options=chrome_options)
 
             # Remove automation indicators

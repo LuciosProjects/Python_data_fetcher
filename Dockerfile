@@ -30,27 +30,21 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     --no-install-recommends
 
-
-# Install Chrome
-# RUN wget -q -O /usr/share/keyrings/google-linux-signing-key.gpg https://dl.google.com/linux/linux_signing_key.pub
-# RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-linux-signing-key.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
-# RUN apt-get update && apt-get install -y google-chrome-stable
-RUN wget -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
-    && apt-get update \
-    && apt-get install -y /tmp/chrome.deb \
-    && rm /tmp/chrome.deb
-
-# # Install ChromeDriver (latest stable)
-# RUN LATEST=$(curl -sS https://chromedriver.storage.googleapis.com/LATEST_RELEASE) \
-#     && wget -O /tmp/chromedriver.zip https://chromedriver.storage.googleapis.com/${LATEST}/chromedriver_linux64.zip \
-#     && unzip /tmp/chromedriver.zip -d /usr/local/bin/ \
-#     && rm /tmp/chromedriver.zip
-# Install ChromeDriver (match Chrome version)
-RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d'.' -f1) \
-    && wget -O /tmp/chromedriver.zip https://chromedriver.storage.googleapis.com/${CHROME_VERSION}/chromedriver_linux64.zip \
-    && unzip /tmp/chromedriver.zip -d /usr/local/bin/ \
-    && rm /tmp/chromedriver.zip
     
+# --- Install Chrome and ChromeDriver 124.0.6367.207 ---
+
+# Download and install Google Chrome
+RUN wget --no-verbose -O /tmp/chrome.deb https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/124.0.6367.207/linux64/chrome-linux64.zip \
+    && unzip /tmp/chrome.deb -d /opt/ \
+    && rm /tmp/chrome.deb \
+    && ln -s /opt/chrome-linux64/chrome /usr/bin/google-chrome-stable
+
+# Download and install ChromeDriver
+RUN wget --no-verbose -O /tmp/chromedriver.zip https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/124.0.6367.207/linux64/chromedriver-linux64.zip \
+    && unzip /tmp/chromedriver.zip -d /usr/bin/ \
+    && rm /tmp/chromedriver.zip \
+    && chmod +x /usr/bin/chromedriver-linux64/chromedriver
+
 # Copy all Python modules and requirements.txt to /app
 COPY *.py /app/
 # Python dependencies

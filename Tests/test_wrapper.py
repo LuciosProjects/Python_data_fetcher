@@ -1015,9 +1015,10 @@ if __name__ == "__main__":
     # test_cloud_run_service()
 
     # Test local function with a single symbol
-    test_local_function_single_symbol("1155365", "08/30/2022")
+    # test_local_function_single_symbol("1155365", "08/30/2022")
+    # test_local_function_single_symbol("1155365")
     # test service function with single symbol
-    # test_cloud_run_service(["1155365"], "08/30/2022")
-    # test_cloud_run_service(["1155365"])
+    test_cloud_run_service(["1155365", "AAPL"], "08/30/2022")
+    test_cloud_run_service(["1155365", "AAPL"])
 
     print("Testing complete!")

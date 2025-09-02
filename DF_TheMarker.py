@@ -122,7 +122,7 @@ def fetch_tase_historical(request: fetchRequest):
                                                 enable_javascript=True, 
                                                 wait_timeout=Constants.SILENT_BROWSER_TIMEOUT)
                 browser = Utilities.SB
-            
+
             # Navigate to page in the dedicated window
             if not browser.navigate_to(url):
                 request.message = "Failed to navigate to page for historical data"
