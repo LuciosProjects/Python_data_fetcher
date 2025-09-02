@@ -11,8 +11,8 @@ class E_FetchType(Enum):
 
 
 # General Constants for Data Fetcher
-VERSION                = "1.4.6" # Version of the Data Fetcher
-PRODUCTION             = True    # Set to True for production environment
+VERSION                = "1.4.7"  # Version of the Data Fetcher
+PRODUCTION             = False    # Set to True for production environment
 
 DEBUG_MODE             = False   # When True, browser will be visible for debugging
 BYPASS_ASYNC_CHECKUP   = False   # Bypass async checkup for debugging

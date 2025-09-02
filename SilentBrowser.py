@@ -92,11 +92,11 @@ class SilentBrowser:
         chrome_options.add_argument("--silent")
         chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
         chrome_options.add_experimental_option('useAutomationExtension', False)
-        chrome_options.binary_location = "/usr/bin/google-chrome-stable"  # <-- Chrome path
 
         try:
             # Use WebDriver Manager to automatically handle ChromeDriver
             if Constants.PRODUCTION:
+                chrome_options.binary_location = "/usr/bin/google-chrome-stable"  # <-- Chrome path
                 service = Service('/usr/bin/chromedriver-linux64/chromedriver')
             else:
                 service = Service(ChromeDriverManager().install())

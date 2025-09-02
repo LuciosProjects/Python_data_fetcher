@@ -117,10 +117,10 @@ def fetch_tase_historical(request: fetchRequest):
                                         wait_timeout=Constants.SILENT_BROWSER_TIMEOUT)
             else:
                 # Sequential mode, use the global session
-                if not hasattr(Utilities.SB, 'driver') or Utilities.SB.driver is None:
-                    Utilities.SB.restart_browser(headless=not Constants.DEBUG_MODE, # Show browser when debugging
-                                                enable_javascript=True, 
-                                                wait_timeout=Constants.SILENT_BROWSER_TIMEOUT)
+                # if not hasattr(Utilities.SB, 'driver') or Utilities.SB.driver is None:
+                Utilities.SB.restart_browser(headless=not Constants.DEBUG_MODE, # Show browser when debugging
+                                            enable_javascript=True, 
+                                            wait_timeout=Constants.SILENT_BROWSER_TIMEOUT)
                 browser = Utilities.SB
 
             # Navigate to page in the dedicated window
@@ -182,7 +182,7 @@ def fetch_tase_historical(request: fetchRequest):
                 Utilities.add_attempt2msg(request, attempt)
                 continue
 
-            target_date = pd.to_datetime(request.date, dayfirst=True)
+            target_date = pd.to_datetime(request.date)
             try:
                 # From this point we assume the max span is successfully pressed
 
@@ -277,19 +277,19 @@ def fetch_tase_historical(request: fetchRequest):
                         request.success = False
                         Utilities.add_attempt2msg(request, attempt)
 
-                        if FLAGS.ASYNC_MODE and attempt >= Constants.MAX_ATTEMPTS:
-                            # Make sure to close the browser after use in async mode
+                        if attempt >= Constants.MAX_ATTEMPTS:
+                            # Make sure to close the browser after use
                             request.date = pd.to_datetime(request.date, dayfirst=True).strftime(Constants.GENERAL_DATE_FORMAT)
                             browser.close()
 
                         continue
                     
-                    if FLAGS.ASYNC_MODE:
-                        # Make sure to close the browser after use in async mode
-                        request.date = pd.to_datetime(request.date, dayfirst=True).strftime(Constants.GENERAL_DATE_FORMAT)
-                        browser.close()
-
                     request.success = True
+
+                    # Make sure to close the browser after use
+                    request.date = pd.to_datetime(request.date, dayfirst=True).strftime(Constants.GENERAL_DATE_FORMAT)
+                    browser.close()
+                    
                     break
             except Exception as e:
                 request.message = "Could not find any valid data points in chart"

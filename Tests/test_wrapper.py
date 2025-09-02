@@ -198,7 +198,7 @@ def test_cloud_run_service(symbols: list, date = None):
     response = requests.post(CLOUD_RUN_URL, 
                              headers=headers, 
                              data=json.dumps(payload),
-                             timeout=Constants.API_SINGLE_TICKER_TIMEOUT * 6)
+                             timeout=Constants.API_SINGLE_TICKER_TIMEOUT * symbols.__len__())
 
     print("Status Code:", response.status_code)
 
@@ -967,7 +967,7 @@ def test_http_post_multiple_requests():
 
 if __name__ == "__main__":
     Constants.PRODUCTION = False
-    Constants.DEBUG_MODE = False  # Enable debug mode for browser visibility
+    Constants.DEBUG_MODE = True  # Enable debug mode for browser visibility
     Constants.BYPASS_ASYNC_CHECKUP = False  # Bypass async check
 
     print("=" * 60)
@@ -1015,10 +1015,19 @@ if __name__ == "__main__":
     # test_cloud_run_service()
 
     # Test local function with a single symbol
-    # test_local_function_single_symbol("1155365", "08/30/2022")
+    today = date.today()
+    date_YTD = date(today.year, 1, 1).strftime("%m/%d/%Y")
+    date_3YR = date(today.year - 3, today.month, today.day).strftime("%m/%d/%Y")
+    date_5YR = date(today.year - 5, today.month, today.day).strftime("%m/%d/%Y")
+
+    # test_local_function_single_symbol("1155365", date_YTD)
+    # test_local_function_single_symbol("1155365", date_3YR)
+    # test_local_function_single_symbol("1155365", date_5YR)
     # test_local_function_single_symbol("1155365")
     # test service function with single symbol
-    test_cloud_run_service(["1155365", "AAPL"], "08/30/2022")
+    test_cloud_run_service(["1155365", "AAPL"], date_YTD)
+    test_cloud_run_service(["1155365", "AAPL"], date_3YR)
+    test_cloud_run_service(["1155365", "AAPL"], date_5YR)
     test_cloud_run_service(["1155365", "AAPL"])
 
     print("Testing complete!")
