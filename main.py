@@ -43,6 +43,7 @@ def python_data_fetch():
 
     # Initialize output dictionary
     output = Utilities.initialize_output_dict()
+    Utilities.initializeFlags()
 
     # Parse JSON body
     request_json = request.get_json(silent=True)
@@ -92,6 +93,7 @@ def collect_financial_data(**kwargs) -> dict:
 
     # Initialize output dictionary
     output = Utilities.initialize_output_dict()
+    Utilities.initializeFlags()
 
     data = kwargs.get("data", None)
 
@@ -155,7 +157,13 @@ def data_fetcher_manager(fetcher_data):
     fetch_types = Utilities.classify_fetch_types(fetcher_data["data"]["indicators"], fetcher_data["data"]["date"])
     YFinance_fetch_cache, TASE_Fast_fetch_cache, TASE_Historical_fetch_cache = Utilities.make_fetch_caches(fetcher_data, fetch_types)
 
-    # Original sequential processing (fallback)
+    # Debugging output
+    print(f"fetch_indicators_async:")
+    print(f"indicators: {fetcher_data['data']['indicators']}")
+    print(f"fetch_types: {fetch_types}")
+    print(f"Flags: yfinance: {FLAGS.NEED_YFINANCE}, tase_fast: {FLAGS.NEED_TASE_FAST}, tase_historical: {FLAGS.NEED_HISTORICAL}")
+
+    # Original sequential processing
     fetch_success = [False]*len(fetcher_data["data"]["indicators"])
 
     # YFinance data fetching

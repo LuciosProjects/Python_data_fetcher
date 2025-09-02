@@ -88,6 +88,14 @@ def initialize_output_dict() -> dict:
     
     return output
 
+def initializeFlags():
+    '''
+    Initialize all flags to False.
+    This is to make sure that in every call to the API, the flags are reset.
+    '''
+    for field in FLAGS.__dataclass_fields__:
+        setattr(FLAGS, field, False)
+
 def get_request_session():
     """Get or create a requests session for connection reuse"""
     global _REQUEST_SESSION

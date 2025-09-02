@@ -105,7 +105,14 @@ async def fetch_indicators_async(fetcher_data) -> List[fetchRequest]:
     # Classify indicators' fetch type
     fetch_types = Utilities.classify_fetch_types(fetcher_data["data"]["indicators"], fetcher_data["data"]["date"])
     YFinance_fetch_cache, TASE_Fast_fetch_cache, TASE_Historical_fetch_cache = Utilities.make_fetch_caches(fetcher_data, fetch_types)
-    
+
+    # Debugging output
+    print(f"fetch_indicators_async:")
+    print(f"indicators: {fetcher_data['data']['indicators']}")
+    print(f"fetch_types: {fetch_types}")
+    print(f"Flags: yfinance: {FLAGS.NEED_YFINANCE}, tase_fast: {FLAGS.NEED_TASE_FAST}, tase_historical: {FLAGS.NEED_HISTORICAL}")
+
+
     # Process async groups in parallel
     tasks = []
     
